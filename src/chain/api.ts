@@ -1,3 +1,5 @@
+import type { GnoValue, QEvalJSONValuesResponse, QObjectJSONValueResponse } from '@gnolang/gnonative';
+
 export type Coin = { denom: string; amount: bigint };
 
 export interface SessionAccountInfo {
@@ -14,6 +16,8 @@ export interface ChainApi {
   setRemote(remote: string): Promise<unknown>;
   setChainID(chainId: string): Promise<unknown>;
   render(packagePath: string, args: string): Promise<string>;
+  qEvalJSONValues(packagePath: string, expression: string): Promise<QEvalJSONValuesResponse>;
+  qObjectJSONValue(value: GnoValue): Promise<QObjectJSONValueResponse>;
   call(
     packagePath: string,
     fnc: string,
