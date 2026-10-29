@@ -26,6 +26,7 @@ export function PriceCard({ data, failed, days, onDays }: { data: Prices | null;
             <Pressable
               key={d}
               accessibilityRole="button"
+              accessibilityLabel={d === 1 ? '1 day' : `${d} days`}
               accessibilityState={{ selected: d === days }}
               onPress={() => onDays(d)}
               style={[styles.segBtn, d === days && styles.segOn]}>

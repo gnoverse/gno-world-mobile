@@ -36,8 +36,8 @@ test('Home shows the price, who is here and the chat; a period asks for its pric
   await render(<HomeScreen />);
   expect(await screen.findByText('$0.0582')).toBeTruthy();
   expect(screen.getByText('18 people')).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Open chat' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /^Chat/ })).toBeTruthy();
   expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=1');
-  await fireEvent.press(screen.getByRole('button', { name: '30d' }));
+  await fireEvent.press(screen.getByRole('button', { name: '30 days' }));
   expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=30');
 });

@@ -24,11 +24,11 @@ describe('PriceCard', () => {
     const onDays = jest.fn();
     await render(<PriceCard data={PRICES} failed={false} days={1} onDays={onDays} />);
     for (const t of ['GNOT', '$0.0582', '−0.31%', 'cap $11.5M']) expect(screen.getByText(t)).toBeTruthy();
-    expect(screen.getByRole('button', { name: '1d' }).props.accessibilityState).toMatchObject({ selected: true });
-    expect(screen.getByRole('button', { name: '7d' }).props.accessibilityState).toMatchObject({ selected: false });
-    await fireEvent.press(screen.getByRole('button', { name: '7d' }));
+    expect(screen.getByRole('button', { name: '1 day' }).props.accessibilityState).toMatchObject({ selected: true });
+    expect(screen.getByRole('button', { name: '7 days' }).props.accessibilityState).toMatchObject({ selected: false });
+    await fireEvent.press(screen.getByRole('button', { name: '7 days' }));
     expect(onDays).toHaveBeenCalledWith(7);
-    expect(screen.getByRole('button', { name: '30d' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '30 days' })).toBeTruthy();
   });
 
   test('without data after a failure: the site text', async () => {
@@ -117,7 +117,10 @@ describe('ChatCard', () => {
     expect(names).toEqual(['ann', 'bob', 'cid']);
     expect(screen.getByText('3h')).toBeTruthy();
     expect(screen.getByText('📎 picture')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Open chat' }));
+    // a screen reader reads the lines, not just the card's purpose
+    const card = screen.getByRole('button', { name: /^Chat\. ann: gm, 3h\. bob: 📎 picture, [^.]+\. cid: when gnoverse\?, [^.]+$/ });
+    expect(card.props.accessibilityHint).toBe('Opens the chat');
+    await fireEvent.press(card);
     expect(router.navigate).toHaveBeenCalledWith('/chat');
   });
 
@@ -144,7 +147,7 @@ describe('ChatCard', () => {
     mockChat.setState({ phase: 'live' });
     await render(<ChatCard />);
     expect(screen.getByText('nothing said yet')).toBeTruthy();
-    await fireEvent.press(screen.getByRole('button', { name: 'Open chat' }));
+    await fireEvent.press(screen.getByRole('button', { name: 'Chat. nothing said yet' }));
     expect(router.navigate).toHaveBeenCalledWith('/chat');
   });
 });

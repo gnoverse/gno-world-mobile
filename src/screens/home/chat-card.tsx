@@ -15,8 +15,19 @@ export function ChatCard() {
   const phase = useChat((s) => s.phase);
   const now = useNow(30000);
   const last = lines.slice(-SHOWN);
+  // lines are not kept between launches: until the first poll, an empty list says nothing
+  const status =
+    phase === 'unreachable'
+      ? 'chat unreachable — retrying'
+      : last.length
+        ? null
+        : phase === 'live'
+          ? 'nothing said yet'
+          : 'loading…';
+  // the button's label is all a screen reader says: the lines go in it
+  const label = ['Chat', ...last.map((l) => `${l.name}: ${placeholder(l) ?? l.body}, ${ago(l.t, now)}`), status].filter(Boolean).join('. ');
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel="Open chat" onPress={() => router.navigate('/chat')}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Opens the chat" onPress={() => router.navigate('/chat')}>
       {({ pressed }) => (
         <View style={pressed && styles.pressed}>
           <Card>
@@ -31,10 +42,7 @@ export function ChatCard() {
                 <Text style={styles.age}>{ago(l.t, now)}</Text>
               </View>
             ))}
-            {/* lines are not kept between launches: until the first poll, an empty list says nothing */}
-            {!last.length && (phase === 'idle' || phase === 'loading') && <Text style={styles.age}>loading…</Text>}
-            {!last.length && phase === 'live' && <Text style={styles.age}>nothing said yet</Text>}
-            {phase === 'unreachable' && <Text style={styles.age}>chat unreachable — retrying</Text>}
+            {status && <Text style={styles.age}>{status}</Text>}
           </Card>
         </View>
       )}
