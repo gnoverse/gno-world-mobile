@@ -5,9 +5,9 @@ export type PriceDays = 1 | 7 | 30;
 export const PRICE_DAYS: PriceDays[] = [1, 7, 30];
 
 export interface Prices {
-  /** USD */
-  now: number;
-  /** percent over the period */
+  /** USD; null: the reply had no price (the site then says "no prices right now") */
+  now: number | null;
+  /** percent, the server's 24h figure whatever the period */
   change: number;
   /** market cap, USD */
   cap: number;
@@ -34,7 +34,7 @@ export async function fetchPrices(oc: Offchain, days: PriceDays): Promise<Prices
   const series = (Array.isArray(o.series) ? o.series : []).filter(
     (p): p is [number, number] => Array.isArray(p) && p.length >= 2 && isNum(p[0]) && isNum(p[1]),
   );
-  return { now: num(o.now), change: num(o.change), cap: num(o.cap), series: series.map(([t, p]) => [t, p]) };
+  return { now: isNum(o.now) ? o.now : null, change: num(o.change), cap: num(o.cap), series: series.map(([t, p]) => [t, p]) };
 }
 
 export async function fetchWhere(oc: Offchain): Promise<Where> {

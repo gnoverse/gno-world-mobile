@@ -8,11 +8,11 @@ test('fetchPrices asks for gnot over the period and reads the reply', async () =
   expect(get).toHaveBeenCalledWith('/api/prices?coin=gnot&days=7');
 });
 
-test('a malformed price reply gives zeros and keeps only finite points', async () => {
+test('a reply without a price says so (null), never $0; only finite points are kept', async () => {
   const oc = { get: jest.fn(async () => ({ now: null, series: [[1, 2], ['x', 3], [4], [5, NaN], [6, 7]] })) } as unknown as Offchain;
-  expect(await fetchPrices(oc, 1)).toEqual({ now: 0, change: 0, cap: 0, series: [[1, 2], [6, 7]] });
+  expect(await fetchPrices(oc, 1)).toEqual({ now: null, change: 0, cap: 0, series: [[1, 2], [6, 7]] });
   const oc2 = { get: jest.fn(async () => 'nope') } as unknown as Offchain;
-  expect(await fetchPrices(oc2, 1)).toEqual({ now: 0, change: 0, cap: 0, series: [] });
+  expect(await fetchPrices(oc2, 1)).toEqual({ now: null, change: 0, cap: 0, series: [] });
 });
 
 test('fetchWhere reads count, countries, elsewhere and geo', async () => {

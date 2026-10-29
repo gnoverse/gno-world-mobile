@@ -12,6 +12,7 @@ const SHOWN = 3;
 export function ChatCard() {
   // the whole array, sliced here: a selector returning a new array re-renders forever under zustand 5
   const lines = useChat((s) => s.lines);
+  const phase = useChat((s) => s.phase);
   const now = useNow(30000);
   const last = lines.slice(-SHOWN);
   return (
@@ -30,7 +31,10 @@ export function ChatCard() {
                 <Text style={styles.age}>{ago(l.t, now)}</Text>
               </View>
             ))}
-            {!last.length && <Text style={styles.age}>nothing said yet</Text>}
+            {/* lines are not kept between launches: until the first poll, an empty list says nothing */}
+            {!last.length && (phase === 'idle' || phase === 'loading') && <Text style={styles.age}>loading…</Text>}
+            {!last.length && phase === 'live' && <Text style={styles.age}>nothing said yet</Text>}
+            {phase === 'unreachable' && <Text style={styles.age}>chat unreachable — retrying</Text>}
           </Card>
         </View>
       )}

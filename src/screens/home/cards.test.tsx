@@ -47,9 +47,17 @@ describe('PriceCard', () => {
     expect(screen.getByText('loading…')).toBeTruthy();
   });
 
-  test('one point is no chart', async () => {
+  test('one point is no chart, and no prices as the site says it', async () => {
     await render(<PriceCard data={{ ...PRICES, series: [[1, 2]] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.queryByTestId('price-chart')).toBeNull();
+    expect(screen.getByText('no prices right now')).toBeTruthy();
+  });
+
+  test('a reply without a price never shows $0', async () => {
+    await render(<PriceCard data={{ now: null, change: 0, cap: 0, series: [] }} failed={false} days={1} onDays={jest.fn()} />);
+    expect(screen.getByText('no prices right now')).toBeTruthy();
+    expect(screen.queryByText(/^\$0/)).toBeNull();
+    expect(screen.queryByText(/^cap/)).toBeNull();
   });
 });
 
@@ -113,7 +121,27 @@ describe('ChatCard', () => {
     expect(router.navigate).toHaveBeenCalledWith('/chat');
   });
 
+  test('before the first lines arrive, the card says it is loading', async () => {
+    mockChat.setState({ phase: 'loading' });
+    await render(<ChatCard />);
+    expect(screen.getByText('loading…')).toBeTruthy();
+    expect(screen.queryByText('nothing said yet')).toBeNull();
+  });
+
+  test('an unreachable chat says so, under the lines it still has', async () => {
+    mockChat.setState({ phase: 'unreachable' });
+    const view = await render(<ChatCard />);
+    expect(screen.getByText('chat unreachable — retrying')).toBeTruthy();
+    expect(screen.queryByText('nothing said yet')).toBeNull();
+    await view.unmount();
+    mockChat.setState({ phase: 'unreachable', lines: [line(1, { name: 'ann', body: 'gm' })] });
+    await render(<ChatCard />);
+    expect(screen.getByText('gm')).toBeTruthy();
+    expect(screen.getByText('chat unreachable — retrying')).toBeTruthy();
+  });
+
   test('an empty chat says so and still opens Chat', async () => {
+    mockChat.setState({ phase: 'live' });
     await render(<ChatCard />);
     expect(screen.getByText('nothing said yet')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Open chat' }));

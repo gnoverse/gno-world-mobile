@@ -10,10 +10,13 @@ import { chartGeom, formatCap, formatChange, formatPrice } from './format';
 
 const CHART_HEIGHT = 80;
 const BUSY = 'prices are busy — trying again'; // the site's words
+const NONE = 'no prices right now'; // the site's words for a reply without prices (priceLoad)
 
 export function PriceCard({ data, failed, days, onDays }: { data: Prices | null; failed: boolean; days: PriceDays; onDays(d: PriceDays): void }) {
   const [width, setWidth] = useState(0);
-  const geom = data && width ? chartGeom(data.series, width, CHART_HEIGHT) : null;
+  // as the site: no price, or fewer than 2 points, is no prices at all — never a $0
+  const shown = data && data.now !== null && data.series.length >= 2 ? { ...data, now: data.now } : null;
+  const geom = shown && width ? chartGeom(shown.series, width, CHART_HEIGHT) : null;
   return (
     <Card>
       <View style={styles.head}>
@@ -31,10 +34,10 @@ export function PriceCard({ data, failed, days, onDays }: { data: Prices | null;
           ))}
         </View>
       </View>
-      {data && (
+      {shown && (
         <View style={styles.now}>
-          <Text style={styles.price}>{formatPrice(data.now)}</Text>
-          <Text style={{ color: data.change < 0 ? colors.bad : colors.ring }}>{formatChange(data.change)}</Text>
+          <Text style={styles.price}>{formatPrice(shown.now)}</Text>
+          <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
         </View>
       )}
       <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
@@ -48,7 +51,8 @@ export function PriceCard({ data, failed, days, onDays }: { data: Prices | null;
           </>
         )}
       </View>
-      {data && <Text style={styles.small}>{formatCap(data.cap)}</Text>}
+      {shown && shown.cap > 0 && <Text style={styles.small}>{formatCap(shown.cap)}</Text>}
+      {data && !shown && <Text style={styles.small}>{NONE}</Text>}
       {!data && !failed && <Text style={styles.small}>loading…</Text>}
       {failed && <Text style={styles.small}>{BUSY}</Text>}
     </Card>
