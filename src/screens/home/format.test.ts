@@ -1,5 +1,6 @@
 import {
-  chartGeom, formatChange, formatFdv, formatPrice, hereRows, hereText, niceTicks, priceScale, readoutText, shortNum, shortUsd, timeTicks,
+  chartGeom, formatChange, formatFdv, formatPrice, hereRows, hereText, labelAnchor, niceTicks, priceScale, readoutText, shortNum, shortUsd,
+  timeTicks,
 } from '@/screens/home/format';
 
 test('prices: 4 decimals under $1, 2 above, with thousands', () => {
@@ -99,4 +100,10 @@ test('time ticks: every 6 hours for a day, midnights for a week, weeks for a mon
   expect(timeTicks(week, week + 7 * 86400, 7).map((x) => x.label)).toEqual(['23', '24', '25', '26', '27', '28', '29']);
   const month = at(2026, 8, 29, 13);
   expect(timeTicks(month, month + 30 * 86400, 30).map((x) => x.label)).toEqual(['30 Sep', '7 Oct', '14 Oct', '21 Oct', '28 Oct']);
+});
+
+test('a time label near an edge leans inward instead of being cut', () => {
+  expect(labelAnchor(2, '30 Sep', 300)).toBe('start');
+  expect(labelAnchor(150, '7 Oct', 300)).toBe('middle');
+  expect(labelAnchor(296, '28 Oct', 300)).toBe('end');
 });

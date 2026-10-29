@@ -149,3 +149,9 @@ export function timeTicks(t0: number, t1: number, days: PriceDays): { t: number;
     ticks.push({ t: d.getTime() / 1000, label: days === 7 ? String(d.getDate()) : dayMonth(d) });
   return ticks;
 }
+
+/** Where a label centred on x would spill past 0 or `width` (about 6 px a character at 10 px), it leans inward. */
+export function labelAnchor(x: number, label: string, width: number): 'start' | 'middle' | 'end' {
+  const half = label.length * 3;
+  return x < half ? 'start' : x > width - half ? 'end' : 'middle';
+}

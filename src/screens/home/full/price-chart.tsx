@@ -5,7 +5,7 @@ import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg
 import type { Prices } from '@/offchain/home';
 import { colors } from '@/theme';
 
-import { formatPrice, niceTicks, priceScale, timeTicks } from '../format';
+import { formatPrice, labelAnchor, niceTicks, priceScale, timeTicks } from '../format';
 import { useCrosshair } from './use-crosshair';
 
 const AXIS_W = 46; // the price labels on the right
@@ -61,7 +61,7 @@ export function PriceChart({ data, color, picked = null, onPick }: {
             <SvgText key={`p${p}`} x={drawn.right + 4} y={drawn.scale.y(p) + 3} fill={colors.muted} fontSize={10}>{axisLabel(p)}</SvgText>
           ))}
           {drawn.times.map(({ t, label }) => (
-            <SvgText key={`t${t}`} x={drawn.scale.x(t)} y={size.height - 4} fill={colors.muted} fontSize={10} textAnchor="middle">{label}</SvgText>
+            <SvgText key={`t${t}`} x={drawn.scale.x(t)} y={size.height - 4} fill={colors.muted} fontSize={10} textAnchor={labelAnchor(drawn.scale.x(t), label, drawn.right)}>{label}</SvgText>
           ))}
           <Path testID="vol-bars" d={drawn.bars} stroke={color} strokeOpacity={0.35} strokeWidth={drawn.barW} />
           <Path d={drawn.area} fill={color} fillOpacity={0.08} />
