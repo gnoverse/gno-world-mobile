@@ -1,4 +1,4 @@
-import { router, useNavigation } from 'expo-router';
+import { useNavigation } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -9,7 +9,7 @@ import { colors, space } from '@/theme';
 import { formatChange, formatPrice, readoutText, shortNum, shortUsd } from '../format';
 import { NO_PRICES, Periods, PRICES_BUSY } from '../price-card';
 import { usePoll } from '../use-poll';
-import { FullHeader } from './full-header';
+import { FullHeader, useBottomGap } from './full-header';
 import { PriceChart } from './price-chart';
 
 // the site's chart colours (priceDraw), by the sign of the change
@@ -44,11 +44,12 @@ export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
   const vol = point && shown?.volumes.find(([t]) => t === point[0]);
   // while a finger reads the chart, sliding it down must not close the sheet
   const navigation = useNavigation();
+  const bottom = useBottomGap();
   const reading = point !== undefined;
   useEffect(() => navigation.setOptions({ gestureEnabled: !reading }), [navigation, reading]);
   return (
-    <View style={styles.root}>
-      <FullHeader title="GNOT" right={<Periods days={days} onDays={setDays} />} onClose={() => router.back()} />
+    <View testID="full-root" style={[styles.root, { paddingBottom: bottom }]}>
+      <FullHeader title="GNOT" right={<Periods days={days} onDays={setDays} />} />
       {shown ? (
         <>
           <View style={styles.now}>
@@ -80,7 +81,7 @@ export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg, paddingBottom: space.xl },
+  root: { flex: 1, backgroundColor: colors.bg },
   now: { flexDirection: 'row', alignItems: 'baseline', gap: space.s, paddingHorizontal: space.l },
   price: { color: colors.fg, fontSize: 28, fontWeight: '600' },
   readout: { paddingHorizontal: space.l, minHeight: 16 },

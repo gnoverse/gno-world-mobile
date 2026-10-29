@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useEffect as mockUseEffect } from 'react';
 
@@ -16,10 +17,11 @@ const mockGet = jest.fn(async (path: string): Promise<unknown> => {
 });
 
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), dismissTo: jest.fn() },
+  router: { back: jest.fn(), dismissTo: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) },
   useFocusEffect: (cb: () => void | (() => void)) => mockUseEffect(cb, [cb]),
 }));
-jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => mockInsets }));
 jest.mock('@/state/app-services', () => ({ useServices: () => ({ offchain: { get: mockGet }, chat: mockChat }) }));
 jest.mock('@/state/settings', () => ({ useSettings: <T,>(sel: (s: { offchainUrl: string }) => T) => sel({ offchainUrl: 'http://fake' }) }));
 
@@ -55,6 +57,16 @@ describe('Here Now', () => {
     expect(await screen.findByText('unknown')).toBeTruthy();
     expect(screen.queryAllByTestId('map-spot')).toHaveLength(0);
     expect(screen.getByText('countries unavailable on this build')).toBeTruthy();
+  });
+
+  test('the table stays above the home indicator or the navigation bar', async () => {
+    mockInsets.bottom = 48;
+    try {
+      await render(<HereFull />);
+      expect(StyleSheet.flatten(screen.getByTestId('here-full-list').props.contentContainerStyle).paddingBottom).toBe(48 + 12);
+    } finally {
+      mockInsets.bottom = 0;
+    }
   });
 
   test('✕ closes', async () => {
@@ -99,6 +111,16 @@ describe('Chat, read only', () => {
     await render(<ChatFull />);
     await fireEvent(screen.getByTestId('chat-full-list'), 'endReached');
     expect(loadOlder).toHaveBeenCalled();
+  });
+
+  test('Write in Chat › stays above the home indicator or the navigation bar', async () => {
+    mockInsets.bottom = 48;
+    try {
+      await render(<ChatFull />);
+      expect(StyleSheet.flatten(screen.getByRole('button', { name: 'Write in Chat ›' }).props.style).paddingBottom).toBe(48 + 12);
+    } finally {
+      mockInsets.bottom = 0;
+    }
   });
 
   test('Write in Chat › goes to the Chat tab', async () => {

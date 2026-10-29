@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useEffect as mockUseEffect } from 'react';
 
@@ -15,12 +16,13 @@ const mockGet = jest.fn(async (path: string): Promise<unknown> => {
 });
 
 jest.mock('expo-router', () => ({
-  router: { back: jest.fn(), push: jest.fn() },
+  router: { back: jest.fn(), push: jest.fn(), replace: jest.fn(), canGoBack: jest.fn(() => true) },
   useFocusEffect: (cb: () => void | (() => void)) => mockUseEffect(cb, [cb]),
   useLocalSearchParams: () => mockParams,
   useNavigation: () => ({ setOptions: mockSetOptions }),
 }));
-jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
+const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => mockInsets }));
 jest.mock('@/state/app-services', () => ({ useServices: () => ({ offchain: { get: mockGet } }) }));
 jest.mock('@/screens/home/format', () => {
   const actual = jest.requireActual('@/screens/home/format');
@@ -124,4 +126,21 @@ test('sliding the finger does not rebuild the chart', async () => {
   } finally {
     jest.useRealTimers();
   }
+});
+
+test('the figures stay above the home indicator or the navigation bar', async () => {
+  mockInsets.bottom = 34;
+  try {
+    await render(<PriceFull initialDays={1} />);
+    expect(StyleSheet.flatten(screen.getByTestId('full-root').props.style).paddingBottom).toBe(34 + 12);
+  } finally {
+    mockInsets.bottom = 0;
+  }
+});
+
+test('opened from a link with nothing behind, ✕ goes to Home', async () => {
+  (router.canGoBack as jest.Mock).mockReturnValueOnce(false);
+  await render(<PriceFull initialDays={1} />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
+  expect(router.replace).toHaveBeenCalledWith('/');
 });

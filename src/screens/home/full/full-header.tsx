@@ -1,11 +1,23 @@
+import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, space } from '@/theme';
 
+/** Back to where the card was opened; opened cold from a link, there is nothing behind it: Home. */
+export function closeFull() {
+  if (router.canGoBack()) router.back();
+  else router.replace('/');
+}
+
+/** Room at the bottom of a full-screen card: the home indicator (iOS) or the navigation bar (Android, edge to edge). */
+export function useBottomGap(): number {
+  return useSafeAreaInsets().bottom + space.m;
+}
+
 /** The top of a full-screen card: its name, what it puts on the right, and ✕. */
-export function FullHeader({ title, right, onClose }: { title: string; right?: ReactNode; onClose(): void }) {
+export function FullHeader({ title, right, onClose = closeFull }: { title: string; right?: ReactNode; onClose?(): void }) {
   const insets = useSafeAreaInsets();
   return (
     // an iOS sheet starts below the status bar; Android's modal covers the whole screen

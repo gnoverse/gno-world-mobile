@@ -11,7 +11,7 @@ import { useServices } from '@/state/app-services';
 import { useSettings } from '@/state/settings';
 import { colors, space } from '@/theme';
 
-import { FullHeader } from './full-header';
+import { FullHeader, useBottomGap } from './full-header';
 
 const NO_REACTIONS: string[] = [];
 const nothing = () => {};
@@ -22,6 +22,7 @@ export function ChatFull() {
   const s = useStore(chat);
   const offchainUrl = useSettings((st) => st.offchainUrl);
   const now = useNow(15000);
+  const bottom = useBottomGap();
   const list = useRef<FlatList<ChatLine>>(null);
   // newest first for the inverted list, as the Chat tab
   const data = useMemo(() => [...s.lines].reverse(), [s.lines]);
@@ -49,7 +50,7 @@ export function ChatFull() {
 
   return (
     <View style={styles.root}>
-      <FullHeader title="CHAT" right={<Text style={styles.here}>{s.here} here</Text>} onClose={() => router.back()} />
+      <FullHeader title="CHAT" right={<Text style={styles.here}>{s.here} here</Text>} />
       {s.phase === 'unreachable' ? <Text style={styles.down}>chat unreachable — retrying</Text> : null}
       <FlatList
         ref={list}
@@ -62,7 +63,7 @@ export function ChatFull() {
         onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: index * 80, animated: true })}
         renderItem={renderItem}
       />
-      <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/chat')} style={styles.foot}>
+      <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/chat')} style={[styles.foot, { paddingBottom: bottom }]}>
         <Text style={styles.write}>Write in Chat ›</Text>
       </Pressable>
     </View>
@@ -73,6 +74,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   here: { color: colors.fg },
   down: { color: colors.bad, textAlign: 'center', paddingBottom: space.xs },
-  foot: { borderTopColor: colors.line, borderTopWidth: 1, paddingTop: space.m, paddingBottom: space.xl, alignItems: 'center' },
+  foot: { borderTopColor: colors.line, borderTopWidth: 1, paddingTop: space.m, alignItems: 'center' },
   write: { color: colors.accent, fontWeight: '600' },
 });
