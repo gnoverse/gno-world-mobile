@@ -1,10 +1,12 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useEffect as mockUseEffect } from 'react';
+import { StyleSheet } from 'react-native';
 import { useStore as mockUseStore } from 'zustand';
 
 import { NO_IDENTITY } from '@/offchain/chat/identity';
 import { createChatStore } from '@/offchain/chat/store';
 import { HomeScreen } from '@/screens/home';
+import { CARD_HEIGHT } from '@/screens/home/layout';
 
 let mockChat: ReturnType<typeof createChatStore>;
 const serve = async (path: string): Promise<unknown> => {
@@ -61,4 +63,11 @@ test('switching period keeps the price while the new chart loads', async () => {
   expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=30');
   expect(screen.getByText('$0.0582')).toBeTruthy();
   expect(screen.getByText('cap $11.5M')).toBeTruthy();
+});
+
+test('the three cards are the same height', async () => {
+  const view = await render(<HomeScreen />);
+  expect(await screen.findByText('18 people')).toBeTruthy();
+  const cards = view.container.queryAll((n) => n.type === 'View' && StyleSheet.flatten(n.props.style)?.height === CARD_HEIGHT);
+  expect(cards).toHaveLength(3);
 });

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { useStore as mockUseStore } from 'zustand';
 
@@ -18,6 +18,9 @@ jest.mock('@/state/app-services', () => ({
 
 const PRICES: Prices = { now: 0.05822, change: -0.308, cap: 11487970.4, series: [[1793183280, 0.0584], [1793183340, 0.0583]] };
 const WHERE: Where = { count: 18, byCountry: [{ cc: 'FR', n: 3 }, { cc: 'AU', n: 1 }], elsewhere: 2, geo: true };
+
+const layout = (el: Parameters<typeof fireEvent>[0], width: number, height: number) =>
+  fireEvent(el, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width, height } } });
 
 describe('PriceCard', () => {
   test('shows the price, the change, the cap and the periods', async () => {
@@ -60,6 +63,12 @@ describe('PriceCard', () => {
     expect(screen.queryByText('no prices right now')).toBeNull();
   });
 
+  test('the chart fills the room the card leaves it', async () => {
+    await render(<PriceCard data={PRICES} failed={false} days={1} onDays={jest.fn()} />);
+    await layout(screen.getByTestId('price-plot'), 300, 97);
+    expect(screen.getByTestId('price-chart').props).toMatchObject({ width: 300, height: 97 });
+  });
+
   test('one point is no chart, and no prices as the site says it', async () => {
     await render(<PriceCard data={{ ...PRICES, series: [[1, 2]] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.queryByTestId('price-chart')).toBeNull();
@@ -95,6 +104,15 @@ describe('HereCard', () => {
   test('before the first answer, the card says it is loading', async () => {
     await render(<HereCard data={null} failed={false} />);
     expect(screen.getByText('loading…')).toBeTruthy();
+  });
+
+  test('many countries scroll inside the card', async () => {
+    const many = ['FR', 'ES', 'BG', 'BR', 'CA', 'GH', 'MX', 'NL', 'US', 'DE', 'IT', 'JP'].map((cc) => ({ cc, n: 1 }));
+    await render(<HereCard data={{ count: 12, byCountry: many, elsewhere: 0, geo: true }} failed={false} />);
+    const rows = screen.getByTestId('here-rows');
+    expect(within(rows).getByText('France')).toBeTruthy();
+    expect(within(rows).getByText('Japan')).toBeTruthy();
+    expect(rows.props.nestedScrollEnabled).toBe(true); // without it, Android does not scroll a list inside the page
   });
 
   test('nobody yet when the table is empty', async () => {
@@ -154,6 +172,16 @@ describe('ChatCard', () => {
     await render(<ChatCard />);
     expect(screen.getByText('gm')).toBeTruthy();
     expect(screen.getByText('chat unreachable — retrying')).toBeTruthy();
+  });
+
+  test('as many of the newest lines as the card has room for', async () => {
+    mockChat.setState({ phase: 'live', lines: Array.from({ length: 12 }, (_, i) => line(i + 1, { name: `n${i + 1}`, body: 'hi' })) });
+    await render(<ChatCard />);
+    expect(screen.getAllByTestId('chat-card-name')).toHaveLength(3); // until measured
+    await layout(screen.getByTestId('chat-card-lines'), 300, 140);
+    await layout(screen.getAllByTestId('chat-card-line')[0], 300, 20);
+    // (140 + 8 gap) / (20 + 8) = 5.3: five lines, the newest
+    expect(screen.getAllByTestId('chat-card-name').map((n) => n.props.children)).toEqual(['n8', 'n9', 'n10', 'n11', 'n12']);
   });
 
   test('an empty chat says so and still opens Chat', async () => {

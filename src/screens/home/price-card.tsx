@@ -7,8 +7,8 @@ import { PRICE_DAYS, type PriceDays, type Prices } from '@/offchain/home';
 import { colors, radius, space } from '@/theme';
 
 import { chartGeom, formatCap, formatChange, formatPrice } from './format';
+import { CARD_HEIGHT } from './layout';
 
-const CHART_HEIGHT = 80;
 const BUSY = 'prices are busy — trying again'; // the site's words
 const NONE = 'no prices right now'; // the site's words for a reply without prices (priceLoad)
 
@@ -26,12 +26,12 @@ export function PriceCard({
   days: PriceDays;
   onDays(d: PriceDays): void;
 }) {
-  const [width, setWidth] = useState(0);
+  const [plot, setPlot] = useState({ width: 0, height: 0 });
   // as the site: no price, or fewer than 2 points, is no prices at all — never a $0
   const shown = data && data.now !== null && data.series.length >= 2 ? { ...data, now: data.now } : null;
-  const geom = shown && width ? chartGeom(shown.series, width, CHART_HEIGHT) : null;
+  const geom = shown && plot.width && plot.height ? chartGeom(shown.series, plot.width, plot.height) : null;
   return (
-    <Card>
+    <Card style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.label}>GNOT</Text>
         <View style={styles.seg}>
@@ -54,30 +54,28 @@ export function PriceCard({
           <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
         </View>
       )}
-      <View
-        testID="price-chart-box"
-        accessibilityState={{ busy: stale }}
-        style={stale && styles.stale}
-        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-        {geom && (
-          <>
-            <Text style={styles.small}>{formatPrice(geom.max)}</Text>
-            <Svg testID="price-chart" width={width} height={CHART_HEIGHT}>
+      <View testID="price-chart-box" accessibilityState={{ busy: stale }} style={[styles.chart, stale && styles.stale]}>
+        {geom && <Text style={styles.small}>{formatPrice(geom.max)}</Text>}
+        {/* the chart takes the height the card leaves it */}
+        <View testID="price-plot" style={styles.plot} onLayout={(e) => setPlot({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
+          {geom && (
+            <Svg testID="price-chart" width={plot.width} height={plot.height} style={styles.svg}>
               <Polyline points={geom.points} fill="none" stroke={colors.accent} strokeWidth={2} strokeLinejoin="round" />
             </Svg>
-            <Text style={styles.small}>{formatPrice(geom.min)}</Text>
-          </>
-        )}
+          )}
+          {data && !shown && !stale && <Text style={styles.small}>{NONE}</Text>}
+          {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
+        </View>
+        {geom && <Text style={styles.small}>{formatPrice(geom.min)}</Text>}
       </View>
       {shown && shown.cap > 0 && <Text style={styles.small}>{formatCap(shown.cap)}</Text>}
-      {data && !shown && !stale && <Text style={styles.small}>{NONE}</Text>}
-      {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
       {failed && <Text style={styles.small}>{BUSY}</Text>}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
+  card: { height: CARD_HEIGHT },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   label: { color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   seg: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: radius.s, padding: 2, gap: 2 },
@@ -89,4 +87,7 @@ const styles = StyleSheet.create({
   price: { color: colors.fg, fontSize: 24, fontWeight: '600' },
   small: { color: colors.muted, fontSize: 11 },
   stale: { opacity: 0.4 },
+  chart: { flex: 1 },
+  plot: { flex: 1, justifyContent: 'center', overflow: 'hidden' },
+  svg: { position: 'absolute', top: 0, left: 0 },
 });
