@@ -82,7 +82,8 @@ export function usePoll<T>(load: () => Promise<T>, everyMs: number, key = ''): P
 
   useFocusEffect(
     useCallback(() => {
-      if (AppState.currentState === 'active') void poller.start(key);
+      // not only 'active': the state can still be unknown at launch
+      if (AppState.currentState !== 'background') void poller.start(key);
       const sub = AppState.addEventListener('change', (st) => (st === 'active' ? void poller.start(key) : poller.stop()));
       return () => {
         poller.stop();
