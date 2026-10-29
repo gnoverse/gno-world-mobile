@@ -9,8 +9,8 @@ import { colors, radius, space } from '@/theme';
 import { chartGeom, formatChange, formatFdv, formatPrice } from './format';
 import { CARD_HEIGHT } from './layout';
 
-const BUSY = 'prices are busy — trying again'; // the site's words
-const NONE = 'no prices right now'; // the site's words for a reply without prices (priceLoad)
+export const PRICES_BUSY = 'prices are busy — trying again'; // the site's words
+export const NO_PRICES = 'no prices right now'; // the site's words for a reply without prices (priceLoad)
 
 export function PriceCard({
   data,
@@ -35,19 +35,7 @@ export function PriceCard({
     <Card style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.label}>GNOT</Text>
-        <View style={styles.seg}>
-          {PRICE_DAYS.map((d) => (
-            <Pressable
-              key={d}
-              accessibilityRole="button"
-              accessibilityLabel={d === 1 ? '1 day' : `${d} days`}
-              accessibilityState={{ selected: d === days }}
-              onPress={() => onDays(d)}
-              style={[styles.segBtn, d === days && styles.segOn]}>
-              <Text style={[styles.segText, d === days && styles.segTextOn]}>{d}d</Text>
-            </Pressable>
-          ))}
-        </View>
+        <Periods days={days} onDays={onDays} />
       </View>
       {shown && (
         <View style={styles.now}>
@@ -64,14 +52,32 @@ export function PriceCard({
               <Polyline points={geom.points} fill="none" stroke={colors.accent} strokeWidth={2} strokeLinejoin="round" />
             </Svg>
           )}
-          {data && !shown && !stale && <Text style={styles.small}>{NONE}</Text>}
+          {data && !shown && !stale && <Text style={styles.small}>{NO_PRICES}</Text>}
           {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
         </View>
         {geom && <Text style={styles.small}>{formatPrice(geom.min)}</Text>}
       </View>
       {figure && <Text style={styles.small}>{figure}</Text>}
-      {failed && <Text style={styles.small}>{BUSY}</Text>}
+      {failed && <Text style={styles.small}>{PRICES_BUSY}</Text>}
     </Card>
+  );
+}
+
+export function Periods({ days, onDays }: { days: PriceDays; onDays(d: PriceDays): void }) {
+  return (
+    <View style={styles.seg}>
+      {PRICE_DAYS.map((d) => (
+        <Pressable
+          key={d}
+          accessibilityRole="button"
+          accessibilityLabel={d === 1 ? '1 day' : `${d} days`}
+          accessibilityState={{ selected: d === days }}
+          onPress={() => onDays(d)}
+          style={[styles.segBtn, d === days && styles.segOn]}>
+          <Text style={[styles.segText, d === days && styles.segTextOn]}>{d}d</Text>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
