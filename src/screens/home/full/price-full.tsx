@@ -1,5 +1,5 @@
 import { router, useNavigation } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { fetchPrices, PRICES_EVERY_MS, type PriceDays, type Prices } from '@/offchain/home';
@@ -36,8 +36,9 @@ export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
   const [days, setDays] = useState<PriceDays>(initialDays);
   const prices = usePoll(() => fetchPrices(offchain, days), PRICES_EVERY_MS, String(days));
   const p = prices.data;
-  // as the card: no price, or fewer than 2 points, is no prices at all
-  const shown = p && p.now !== null && p.series.length >= 2 ? { ...p, now: p.now } : null;
+  // as the card: no price, or fewer than 2 points, is no prices at all; kept per reply, so a finger moving over the
+  // chart does not rebuild it
+  const shown = useMemo(() => (p && p.now !== null && p.series.length >= 2 ? { ...p, now: p.now } : null), [p]);
   const [picked, setPicked] = useState<number | null>(null);
   const point = shown && picked !== null ? shown.series[picked] : undefined;
   const vol = point && shown?.volumes.find(([t]) => t === point[0]);

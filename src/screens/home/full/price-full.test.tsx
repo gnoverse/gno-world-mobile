@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect as mockUseEffect } from 'react';
 
 import PriceRoute from '@/app/home/price';
-import { readoutText } from '@/screens/home/format';
+import { priceScale, readoutText } from '@/screens/home/format';
 import { PriceFull } from '@/screens/home/full/price-full';
 
 let mockParams: Record<string, string> = {};
@@ -22,6 +22,10 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('@/state/app-services', () => ({ useServices: () => ({ offchain: { get: mockGet } }) }));
+jest.mock('@/screens/home/format', () => {
+  const actual = jest.requireActual('@/screens/home/format');
+  return { ...actual, priceScale: jest.fn(actual.priceScale) };
+});
 
 beforeEach(() => {
   mockGet.mockClear();
@@ -98,6 +102,25 @@ test('hold and slide on the chart: the moment is read out, and the sheet stays p
     await fireEvent(chart, 'responderRelease', at(0));
     expect(screen.queryByText(readoutText(1, 0.06, 100))).toBeNull();
     expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('sliding the finger does not rebuild the chart', async () => {
+  jest.useFakeTimers();
+  try {
+    await render(<PriceFull initialDays={1} />);
+    expect(await screen.findByText('$0.0583')).toBeTruthy();
+    const chart = screen.getByTestId('full-chart');
+    await fireEvent(chart, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 300 } } });
+    const at = (x: number) => ({ nativeEvent: { locationX: x, locationY: 100, pageX: x, pageY: 100 } });
+    const built = (priceScale as jest.Mock).mock.calls.length;
+    await fireEvent(chart, 'responderGrant', at(150));
+    await act(async () => void jest.advanceTimersByTime(200));
+    await fireEvent(chart, 'responderMove', at(10));
+    await fireEvent(chart, 'responderMove', at(290));
+    expect((priceScale as jest.Mock).mock.calls.length).toBe(built);
   } finally {
     jest.useRealTimers();
   }
