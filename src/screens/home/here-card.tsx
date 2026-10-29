@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 
 import { Card } from '@/components/card';
 import type { Where } from '@/offchain/home';
@@ -8,16 +8,22 @@ import { flagEmoji } from '@/utils/flag';
 
 import { hereRows, hereText, type HereRow } from './format';
 import { CARD_HEIGHT } from './layout';
+import { OpenButton } from './open-button';
 
-export function HereCard({ data, failed }: { data: Where | null; failed: boolean }) {
+export function HereCard({ data, failed, onOpen }: { data: Where | null; failed: boolean; onOpen?(): void }) {
   const rows = data ? hereRows(data) : [];
   const list = useRef<ScrollViewInstance>(null);
   return (
     <Card style={styles.card}>
-      <View style={styles.head}>
+      {/* a tap on the header or the rows opens it full screen; the press areas sit inside the list, so a drag still
+          scrolls it, and they are not accessible elements, so the rows stay readable one by one */}
+      <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => [styles.head, pressed && styles.pressed]}>
         <Text style={styles.label}>HERE NOW</Text>
-        {data && <Text style={styles.total}>{hereText(data)}</Text>}
-      </View>
+        <View style={styles.right}>
+          {data && <Text style={styles.total}>{hereText(data)}</Text>}
+          <OpenButton label="Open Here Now full screen" onPress={onOpen} />
+        </View>
+      </Pressable>
       {/* a long table scrolls within the card (Android scrolls a list inside the page only when told); a flash of the bar says there is more */}
       <ScrollView
         ref={list}
@@ -26,12 +32,14 @@ export function HereCard({ data, failed }: { data: Where | null; failed: boolean
         contentContainerStyle={styles.rowsIn}
         nestedScrollEnabled
         onContentSizeChange={() => list.current?.flashScrollIndicators()}>
-        {rows.map((r) => (
-          <CountryRow key={r.cc || r.name} row={r} />
-        ))}
-        {data && !rows.length && <Text style={styles.muted}>nobody yet</Text>}
-        {!data && !failed && <Text style={styles.muted}>loading…</Text>}
-        {failed && <Text style={styles.muted}>{data ? 'could not refresh — trying again' : 'server unreachable — trying again'}</Text>}
+        <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => [styles.rowsIn, pressed && styles.pressed]}>
+          {rows.map((r) => (
+            <CountryRow key={r.cc || r.name} row={r} />
+          ))}
+          {data && !rows.length && <Text style={styles.muted}>nobody yet</Text>}
+          {!data && !failed && <Text style={styles.muted}>loading…</Text>}
+          {failed && <Text style={styles.muted}>{data ? 'could not refresh — trying again' : 'server unreachable — trying again'}</Text>}
+        </Pressable>
       </ScrollView>
     </Card>
   );
@@ -52,6 +60,8 @@ export function CountryRow({ row, total }: { row: HereRow; total?: number }) {
 
 const styles = StyleSheet.create({
   card: { height: CARD_HEIGHT },
+  pressed: { opacity: 0.7 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: space.s, flexShrink: 1 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.s },
   label: { color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   total: { color: colors.fg, flexShrink: 1, textAlign: 'right' },

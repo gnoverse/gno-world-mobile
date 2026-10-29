@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 
@@ -31,8 +32,11 @@ export function HomeScreen() {
           }}
         />
       }>
-      <PriceCard data={prices.data} stale={prices.stale} failed={prices.failed} days={days} onDays={setDays} />
-      <HereCard data={where.data} failed={where.failed} />
+      <PriceCard
+        data={prices.data} stale={prices.stale} failed={prices.failed} days={days} onDays={setDays}
+        onOpen={() => router.push({ pathname: '/home/price', params: { days: String(days) } })}
+      />
+      <HereCard data={where.data} failed={where.failed} onOpen={() => router.push('/home/here')} />
       <ChatCard />
     </ScrollView>
   );

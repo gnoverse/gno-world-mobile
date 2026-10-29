@@ -8,6 +8,7 @@ import { colors, radius, space } from '@/theme';
 
 import { chartGeom, formatChange, formatFdv, formatPrice } from './format';
 import { CARD_HEIGHT } from './layout';
+import { OpenButton } from './open-button';
 
 export const PRICES_BUSY = 'prices are busy — trying again'; // the site's words
 export const NO_PRICES = 'no prices right now'; // the site's words for a reply without prices (priceLoad)
@@ -18,6 +19,7 @@ export function PriceCard({
   failed,
   days,
   onDays,
+  onOpen,
 }: {
   data: Prices | null;
   /** data is another period's, this one's is loading: the price holds (the same whatever the period), the chart dims */
@@ -25,6 +27,8 @@ export function PriceCard({
   failed: boolean;
   days: PriceDays;
   onDays(d: PriceDays): void;
+  /** open the card full screen */
+  onOpen?(): void;
 }) {
   const [plot, setPlot] = useState({ width: 0, height: 0 });
   // as the site: no price, or fewer than 2 points, is no prices at all — never a $0
@@ -32,34 +36,40 @@ export function PriceCard({
   const geom = shown && plot.width && plot.height ? chartGeom(shown.series, plot.width, plot.height) : null;
   const figure = shown && formatFdv(shown);
   return (
-    <Card style={styles.card}>
-      <View style={styles.head}>
-        <Text style={styles.label}>GNOT</Text>
-        <Periods days={days} onDays={onDays} />
-      </View>
-      {shown && (
-        <View style={styles.now}>
-          <Text style={styles.price}>{formatPrice(shown.now)}</Text>
-          <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
+    // a tap anywhere but the periods opens it; not one accessible element, so the periods and › stay reachable
+    <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => pressed && styles.pressed}>
+      <Card style={styles.card}>
+        <View style={styles.head}>
+          <Text style={styles.label}>GNOT</Text>
+          <View style={styles.right}>
+            <Periods days={days} onDays={onDays} />
+            <OpenButton label="Open GNOT full screen" onPress={onOpen} />
+          </View>
         </View>
-      )}
-      <View testID="price-chart-box" accessibilityState={{ busy: stale }} style={[styles.chart, stale && styles.stale]}>
-        {geom && <Text style={styles.small}>{formatPrice(geom.max)}</Text>}
-        {/* the chart takes the height the card leaves it */}
-        <View testID="price-plot" style={styles.plot} onLayout={(e) => setPlot({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
-          {geom && (
-            <Svg testID="price-chart" width={plot.width} height={plot.height} style={styles.svg}>
-              <Polyline points={geom.points} fill="none" stroke={colors.accent} strokeWidth={2} strokeLinejoin="round" />
-            </Svg>
-          )}
-          {data && !shown && !stale && <Text style={styles.small}>{NO_PRICES}</Text>}
-          {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
+        {shown && (
+          <View style={styles.now}>
+            <Text style={styles.price}>{formatPrice(shown.now)}</Text>
+            <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
+          </View>
+        )}
+        <View testID="price-chart-box" accessibilityState={{ busy: stale }} style={[styles.chart, stale && styles.stale]}>
+          {geom && <Text style={styles.small}>{formatPrice(geom.max)}</Text>}
+          {/* the chart takes the height the card leaves it */}
+          <View testID="price-plot" style={styles.plot} onLayout={(e) => setPlot({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
+            {geom && (
+              <Svg testID="price-chart" width={plot.width} height={plot.height} style={styles.svg}>
+                <Polyline points={geom.points} fill="none" stroke={colors.accent} strokeWidth={2} strokeLinejoin="round" />
+              </Svg>
+            )}
+            {data && !shown && !stale && <Text style={styles.small}>{NO_PRICES}</Text>}
+            {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
+          </View>
+          {geom && <Text style={styles.small}>{formatPrice(geom.min)}</Text>}
         </View>
-        {geom && <Text style={styles.small}>{formatPrice(geom.min)}</Text>}
-      </View>
-      {figure && <Text style={styles.small}>{figure}</Text>}
-      {failed && <Text style={styles.small}>{PRICES_BUSY}</Text>}
-    </Card>
+        {figure && <Text style={styles.small}>{figure}</Text>}
+        {failed && <Text style={styles.small}>{PRICES_BUSY}</Text>}
+      </Card>
+    </Pressable>
   );
 }
 
@@ -83,6 +93,8 @@ export function Periods({ days, onDays }: { days: PriceDays; onDays(d: PriceDays
 
 const styles = StyleSheet.create({
   card: { height: CARD_HEIGHT },
+  pressed: { opacity: 0.7 },
+  right: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   label: { color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   seg: { flexDirection: 'row', backgroundColor: colors.bg, borderRadius: radius.s, padding: 2, gap: 2 },

@@ -35,7 +35,7 @@ export function ChatCard() {
   // the button's label is all a screen reader says: the lines go in it
   const label = ['Chat', ...last.map((l) => `${l.name}: ${placeholder(l) ?? l.body}, ${ago(l.t, now)}`), status].filter(Boolean).join('. ');
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Opens the chat" onPress={() => router.navigate('/chat')}>
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityHint="Opens the chat to read" onPress={() => router.navigate('/home/chat')}>
       {({ pressed }) => (
         <View style={pressed && styles.pressed}>
           <Card style={styles.card}>

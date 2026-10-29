@@ -23,6 +23,18 @@ const layout = (el: Parameters<typeof fireEvent>[0], width: number, height: numb
   fireEvent(el, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width, height } } });
 
 describe('PriceCard', () => {
+  test('a tap on the card or its › opens it full screen; the periods still switch the card', async () => {
+    const [onOpen, onDays] = [jest.fn(), jest.fn()];
+    await render(<PriceCard data={PRICES} failed={false} days={1} onDays={onDays} onOpen={onOpen} />);
+    await fireEvent.press(screen.getByText('$0.0582'));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByRole('button', { name: '7 days' }));
+    expect(onDays).toHaveBeenCalledWith(7);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByRole('button', { name: 'Open GNOT full screen' }));
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
   test('shows the price, the change, the fdv and the periods', async () => {
     const onDays = jest.fn();
     await render(<PriceCard data={PRICES} failed={false} days={1} onDays={onDays} />);
@@ -89,6 +101,14 @@ describe('PriceCard', () => {
 });
 
 describe('HereCard', () => {
+  test('a tap on the card or its › opens it full screen', async () => {
+    const onOpen = jest.fn();
+    await render(<HereCard data={WHERE} failed={false} onOpen={onOpen} />);
+    await fireEvent.press(screen.getByText('France'));
+    await fireEvent.press(screen.getByRole('button', { name: 'Open Here Now full screen' }));
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
   test('the total and the table, elsewhere included', async () => {
     await render(<HereCard data={WHERE} failed={false} />);
     expect(screen.getByText('18 people')).toBeTruthy();
@@ -155,9 +175,9 @@ describe('ChatCard', () => {
     expect(screen.getByText('📎 picture')).toBeTruthy();
     // a screen reader reads the lines, not just the card's purpose
     const card = screen.getByRole('button', { name: /^Chat\. ann: gm, 3h\. bob: 📎 picture, [^.]+\. cid: when gnoverse\?, [^.]+$/ });
-    expect(card.props.accessibilityHint).toBe('Opens the chat');
+    expect(card.props.accessibilityHint).toBe('Opens the chat to read');
     await fireEvent.press(card);
-    expect(router.navigate).toHaveBeenCalledWith('/chat');
+    expect(router.navigate).toHaveBeenCalledWith('/home/chat');
   });
 
   test('before the first lines arrive, the card says it is loading', async () => {
@@ -194,6 +214,6 @@ describe('ChatCard', () => {
     await render(<ChatCard />);
     expect(screen.getByText('nothing said yet')).toBeTruthy();
     await fireEvent.press(screen.getByRole('button', { name: 'Chat. nothing said yet' }));
-    expect(router.navigate).toHaveBeenCalledWith('/chat');
+    expect(router.navigate).toHaveBeenCalledWith('/home/chat');
   });
 });

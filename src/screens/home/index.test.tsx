@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { router } from 'expo-router';
 import { useEffect as mockUseEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { useStore as mockUseStore } from 'zustand';
@@ -17,7 +18,7 @@ const serve = async (path: string): Promise<unknown> => {
 const mockGet = jest.fn(serve);
 
 jest.mock('expo-router', () => ({
-  router: { navigate: jest.fn() },
+  router: { navigate: jest.fn(), push: jest.fn() },
   useFocusEffect: (cb: () => void | (() => void)) => mockUseEffect(cb, [cb]),
 }));
 jest.mock('@/state/app-services', () => ({
@@ -70,4 +71,14 @@ test('the three cards are the same height', async () => {
   expect(await screen.findByText('18 people')).toBeTruthy();
   const cards = view.container.queryAll((n) => n.type === 'View' && StyleSheet.flatten(n.props.style)?.height === CARD_HEIGHT);
   expect(cards).toHaveLength(3);
+});
+
+test('the cards open full screen, the price on the period it shows', async () => {
+  await render(<HomeScreen />);
+  expect(await screen.findByText('18 people')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: '30 days' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Open GNOT full screen' }));
+  expect(router.push).toHaveBeenCalledWith({ pathname: '/home/price', params: { days: '30' } });
+  await fireEvent.press(screen.getByRole('button', { name: 'Open Here Now full screen' }));
+  expect(router.push).toHaveBeenCalledWith('/home/here');
 });
