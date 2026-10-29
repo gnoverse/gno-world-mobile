@@ -42,6 +42,11 @@ describe('PriceCard', () => {
     expect(screen.getByText('prices are busy — trying again')).toBeTruthy();
   });
 
+  test('while a period loads, the card says so instead of going blank', async () => {
+    await render(<PriceCard data={null} failed={false} days={30} onDays={jest.fn()} />);
+    expect(screen.getByText('loading…')).toBeTruthy();
+  });
+
   test('one point is no chart', async () => {
     await render(<PriceCard data={{ ...PRICES, series: [[1, 2]] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.queryByTestId('price-chart')).toBeNull();
@@ -64,6 +69,11 @@ describe('HereCard', () => {
     expect(screen.getByText('18 people · countries unavailable on this build')).toBeTruthy();
     expect(screen.getByText('unknown')).toBeTruthy();
     expect(screen.getByText('18')).toBeTruthy();
+  });
+
+  test('before the first answer, the card says it is loading', async () => {
+    await render(<HereCard data={null} failed={false} />);
+    expect(screen.getByText('loading…')).toBeTruthy();
   });
 
   test('nobody yet when the table is empty', async () => {

@@ -49,6 +49,7 @@ export function PriceCard({ data, failed, days, onDays }: { data: Prices | null;
         )}
       </View>
       {data && <Text style={styles.small}>{formatCap(data.cap)}</Text>}
+      {!data && !failed && <Text style={styles.small}>loading…</Text>}
       {failed && <Text style={styles.small}>{BUSY}</Text>}
     </Card>
   );

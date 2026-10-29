@@ -24,6 +24,7 @@ export function HereCard({ data, failed }: { data: Where | null; failed: boolean
         </View>
       ))}
       {data && !rows.length && <Text style={styles.muted}>nobody yet</Text>}
+      {!data && !failed && <Text style={styles.muted}>loading…</Text>}
       {failed && <Text style={styles.muted}>{data ? 'could not refresh — trying again' : 'server unreachable — trying again'}</Text>}
     </Card>
   );

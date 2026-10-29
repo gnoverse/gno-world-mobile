@@ -377,6 +377,15 @@ export async function startFakeServer(port = 0, o: FakeOptions = {}): Promise<Fa
         if (g && !groups.includes(g)) groups.push(g);
         return send(res, 200, { you: 'FR', count: 3 });
       }
+      // the Home tab: fixed prices and a fixed crowd
+      if (route === 'GET /api/prices') {
+        const days = Number(q.get('days')) || 1;
+        const at = Math.floor(Date.now() / 1000);
+        const step = (days * 86400) / 59;
+        const series = Array.from({ length: 60 }, (_, i) => [Math.round(at - (59 - i) * step), Number((0.0582 + 0.002 * Math.sin(i / 6) * (1 - i / 59)).toFixed(5))]);
+        return send(res, 200, { coin: 'gnot', name: 'GNOT', days, now: 0.0582, at, change: -0.31, cap: 11487970.4, series });
+      }
+      if (route === 'GET /api/where') return send(res, 200, { by_country: [{ cc: 'FR', n: 3 }, { cc: 'ES', n: 1 }], count: 5, elsewhere: 1, geo: true });
 
       // test-only routes
       if (route === 'POST /__test/say') {
