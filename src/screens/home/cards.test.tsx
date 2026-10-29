@@ -16,8 +16,8 @@ jest.mock('@/state/app-services', () => ({
   useChat: <T,>(sel: (s: ReturnType<typeof mockChat.getState>) => T) => mockUseStore(mockChat, sel),
 }));
 
-const PRICES: Prices = { now: 0.05822, change: -0.308, cap: 11487970.4, series: [[1793183280, 0.0584], [1793183340, 0.0583]] };
-const WHERE: Where = { count: 18, byCountry: [{ cc: 'FR', n: 3 }, { cc: 'AU', n: 1 }], elsewhere: 2, geo: true };
+const PRICES: Prices = { now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 0, supply: 0, series: [[1793183280, 0.0584], [1793183340, 0.0583]], volumes: [] };
+const WHERE: Where = { count: 18, byCountry: [{ cc: 'FR', n: 3 }, { cc: 'AU', n: 1 }], elsewhere: 2, geo: true, spots: [] };
 
 const layout = (el: Parameters<typeof fireEvent>[0], width: number, height: number) =>
   fireEvent(el, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width, height } } });
@@ -76,7 +76,7 @@ describe('PriceCard', () => {
   });
 
   test('a reply without a price never shows $0', async () => {
-    await render(<PriceCard data={{ now: null, change: 0, cap: 0, series: [] }} failed={false} days={1} onDays={jest.fn()} />);
+    await render(<PriceCard data={{ now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [], volumes: [] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.getByText('no prices right now')).toBeTruthy();
     expect(screen.queryByText(/^\$0/)).toBeNull();
     expect(screen.queryByText(/^cap/)).toBeNull();
@@ -95,7 +95,7 @@ describe('HereCard', () => {
   });
 
   test('countries unavailable: one unknown row with the total', async () => {
-    await render(<HereCard data={{ ...WHERE, byCountry: [], elsewhere: 0, geo: false }} failed={false} />);
+    await render(<HereCard data={{ ...WHERE, byCountry: [], elsewhere: 0, geo: false, spots: [] }} failed={false} />);
     expect(screen.getByText('18 people · countries unavailable on this build')).toBeTruthy();
     expect(screen.getByText('unknown')).toBeTruthy();
     expect(screen.getByText('18')).toBeTruthy();
@@ -108,7 +108,7 @@ describe('HereCard', () => {
 
   test('many countries scroll inside the card', async () => {
     const many = ['FR', 'ES', 'BG', 'BR', 'CA', 'GH', 'MX', 'NL', 'US', 'DE', 'IT', 'JP'].map((cc) => ({ cc, n: 1 }));
-    await render(<HereCard data={{ count: 12, byCountry: many, elsewhere: 0, geo: true }} failed={false} />);
+    await render(<HereCard data={{ count: 12, byCountry: many, elsewhere: 0, geo: true, spots: [] }} failed={false} />);
     const rows = screen.getByTestId('here-rows');
     expect(within(rows).getByText('France')).toBeTruthy();
     expect(within(rows).getByText('Japan')).toBeTruthy();
@@ -116,7 +116,7 @@ describe('HereCard', () => {
   });
 
   test('nobody yet when the table is empty', async () => {
-    await render(<HereCard data={{ count: 0, byCountry: [], elsewhere: 0, geo: true }} failed={false} />);
+    await render(<HereCard data={{ count: 0, byCountry: [], elsewhere: 0, geo: true, spots: [] }} failed={false} />);
     expect(screen.getByText('nobody yet')).toBeTruthy();
   });
 });

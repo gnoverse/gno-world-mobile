@@ -383,9 +383,14 @@ export async function startFakeServer(port = 0, o: FakeOptions = {}): Promise<Fa
         const at = Math.floor(Date.now() / 1000);
         const step = (days * 86400) / 59;
         const series = Array.from({ length: 60 }, (_, i) => [Math.round(at - (59 - i) * step), Number((0.0582 + 0.002 * Math.sin(i / 6) * (1 - i / 59)).toFixed(5))]);
-        return send(res, 200, { coin: 'gnot', name: 'GNOT', days, now: 0.0582, at, change: -0.31, cap: 11487970.4, series });
+        // every third point traded nothing, as on the real chart
+        const volumes = series.map(([t], i) => [t, i % 3 ? Math.round(100 + 900 * Math.abs(Math.cos(i))) : 0]);
+        return send(res, 200, { coin: 'gnot', name: 'GNOT', days, now: 0.0582, at, change: -0.31, cap: 11487970.4, supply: 1333000000, fdv: 77713900, series, volumes });
       }
-      if (route === 'GET /api/where') return send(res, 200, { by_country: [{ cc: 'FR', n: 3 }, { cc: 'ES', n: 1 }], count: 5, elsewhere: 1, geo: true });
+      if (route === 'GET /api/where') {
+        const spots = [{ cc: 'FR', lat: 48.75, lon: 2.25, n: 2 }, { cc: 'FR', lat: 45.75, lon: 4.75, n: 1 }, { cc: 'ES', lat: 40.5, lon: -3.75, n: 1 }];
+        return send(res, 200, { by_country: [{ cc: 'FR', n: 3 }, { cc: 'ES', n: 1 }], count: 5, elsewhere: 1, geo: true, spots });
+      }
 
       // test-only routes
       if (route === 'POST /__test/say') {

@@ -11,8 +11,22 @@ export interface Prices {
   change: number;
   /** market cap, USD */
   cap: number;
+  /** fully diluted value, USD (price × supply) */
+  fdv: number;
+  /** total supply, GNOT */
+  supply: number;
   /** [seconds, USD], ascending */
   series: [number, number][];
+  /** [seconds, USD traded], one per point of series when the server has it */
+  volumes: [number, number][];
+}
+
+/** An approximate place where people are (a grid of about 0.25°). */
+export interface Spot {
+  cc: string;
+  lat: number;
+  lon: number;
+  n: number;
 }
 
 export interface Where {
@@ -23,19 +37,33 @@ export interface Where {
   elsewhere: number;
   /** false: this server build cannot place people */
   geo: boolean;
+  spots: Spot[];
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const obj = (r: unknown) => (r && typeof r === 'object' ? r : {}) as Record<string, unknown>;
 
+const points = (v: unknown): [number, number][] =>
+  (Array.isArray(v) ? v : [])
+    .filter((p): p is [number, number] => Array.isArray(p) && p.length >= 2 && isNum(p[0]) && isNum(p[1]))
+    .map(([t, p]) => [t, p]);
+
 export async function fetchPrices(oc: Offchain, days: PriceDays): Promise<Prices> {
   const o = obj(await oc.get<unknown>(`/api/prices?coin=gnot&days=${days}`));
-  const series = (Array.isArray(o.series) ? o.series : []).filter(
-    (p): p is [number, number] => Array.isArray(p) && p.length >= 2 && isNum(p[0]) && isNum(p[1]),
-  );
-  return { now: isNum(o.now) ? o.now : null, change: num(o.change), cap: num(o.cap), series: series.map(([t, p]) => [t, p]) };
+  return {
+    now: isNum(o.now) ? o.now : null,
+    change: num(o.change),
+    cap: num(o.cap),
+    fdv: num(o.fdv),
+    supply: num(o.supply),
+    series: points(o.series),
+    volumes: points(o.volumes),
+  };
 }
+
+const isSpot = (c: Record<string, unknown>) =>
+  typeof c.cc === 'string' && isNum(c.lat) && Math.abs(c.lat) <= 90 && isNum(c.lon) && Math.abs(c.lon) <= 180 && isNum(c.n) && c.n > 0;
 
 export async function fetchWhere(oc: Offchain): Promise<Where> {
   const o = obj(await oc.get<unknown>('/api/where'));
@@ -44,5 +72,9 @@ export async function fetchWhere(oc: Offchain): Promise<Where> {
     .filter((c) => typeof c.cc === 'string' && isNum(c.n))
     .map((c) => ({ cc: c.cc as string, n: c.n as number }));
   // the site reads a missing geo as "countries unavailable"
-  return { count: num(o.count), byCountry, elsewhere: num(o.elsewhere), geo: o.geo === true };
+  const spots = (Array.isArray(o.spots) ? o.spots : [])
+    .map(obj)
+    .filter(isSpot)
+    .map((c) => ({ cc: c.cc as string, lat: c.lat as number, lon: c.lon as number, n: c.n as number }));
+  return { count: num(o.count), byCountry, elsewhere: num(o.elsewhere), geo: o.geo === true, spots };
 }

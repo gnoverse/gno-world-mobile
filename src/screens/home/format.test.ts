@@ -22,7 +22,7 @@ test('cap: shortened', () => {
 });
 
 test('the total in the site words', () => {
-  const w = { count: 18, byCountry: [], elsewhere: 0, geo: true };
+  const w = { count: 18, byCountry: [], elsewhere: 0, geo: true, spots: [] };
   expect(hereText(w)).toBe('18 people');
   expect(hereText({ ...w, count: 1 })).toBe('just you');
   expect(hereText({ ...w, count: 0 })).toBe('nobody here right now');
@@ -30,7 +30,7 @@ test('the total in the site words', () => {
 });
 
 test('rows: bars against the biggest, elsewhere without a bar', () => {
-  expect(hereRows({ count: 6, byCountry: [{ cc: 'FR', n: 3 }, { cc: 'AU', n: 1 }], elsewhere: 2, geo: true })).toEqual([
+  expect(hereRows({ count: 6, byCountry: [{ cc: 'FR', n: 3 }, { cc: 'AU', n: 1 }], elsewhere: 2, geo: true, spots: [] })).toEqual([
     { cc: 'FR', name: 'France', n: 3, share: 1 },
     { cc: 'AU', name: 'Australia', n: 1, share: 1 / 3 },
     { cc: '', name: 'elsewhere', n: 2, share: null },
@@ -38,8 +38,8 @@ test('rows: bars against the biggest, elsewhere without a bar', () => {
 });
 
 test('countries unavailable: one "unknown" row with a full bar and the total', () => {
-  expect(hereRows({ count: 18, byCountry: [], elsewhere: 0, geo: false })).toEqual([{ cc: '', name: 'unknown', n: 18, share: 1 }]);
-  expect(hereRows({ count: 0, byCountry: [], elsewhere: 0, geo: false })).toEqual([]);
+  expect(hereRows({ count: 18, byCountry: [], elsewhere: 0, geo: false, spots: [] })).toEqual([{ cc: '', name: 'unknown', n: 18, share: 1 }]);
+  expect(hereRows({ count: 0, byCountry: [], elsewhere: 0, geo: false, spots: [] })).toEqual([]);
 });
 
 test('chart: spans the width, highest at the top, lowest at the bottom', () => {
