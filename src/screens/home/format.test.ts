@@ -16,6 +16,9 @@ test('cap: shortened', () => {
   expect(formatCap(2_400_000_000)).toBe('cap $2.4B');
   expect(formatCap(950)).toBe('cap $950');
   expect(formatCap(12_300)).toBe('cap $12.3k');
+  // rounding up to the next unit names that unit
+  expect(formatCap(999_950)).toBe('cap $1M');
+  expect(formatCap(999.7)).toBe('cap $1k');
 });
 
 test('the total in the site words', () => {

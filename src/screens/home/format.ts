@@ -6,14 +6,22 @@ export function formatPrice(usd: number): string {
   return '$' + usd.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
 }
 
-/** a sign always, the real minus sign as the site writes it */
+/** a sign always; the site writes "-" and 1 decimal, here the real minus sign and 2 decimals */
 export const formatChange = (pct: number) => `${pct < 0 ? '−' : '+'}${Math.abs(pct).toFixed(2)}%`;
 
+const CAP_UNITS: [number, string][] = [
+  [1e9, 'B'],
+  [1e6, 'M'],
+  [1e3, 'k'],
+];
+
 export function formatCap(usd: number): string {
-  const short = (v: number, unit: string) => `${Number(v.toFixed(1))}${unit}`;
-  const s =
-    usd >= 1e9 ? short(usd / 1e9, 'B') : usd >= 1e6 ? short(usd / 1e6, 'M') : usd >= 1e3 ? short(usd / 1e3, 'k') : String(Math.round(usd));
-  return `cap $${s}`;
+  // the largest unit that still reads 1 or more once rounded: 999,950 is $1M, not $1000k
+  for (const [div, unit] of CAP_UNITS) {
+    const v = Number((usd / div).toFixed(1));
+    if (v >= 1) return `cap $${v}${unit}`;
+  }
+  return `cap $${Math.round(usd)}`;
 }
 
 /** The site's words for the total (herePaint). */
