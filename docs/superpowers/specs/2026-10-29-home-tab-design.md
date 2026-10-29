@@ -42,7 +42,7 @@ Lu dans le JS en ligne de gno.world le 2026-10-29 (`app-boot.js` : `herePaint`, 
  "cap":11487970.4,"supply":1333000000,"fdv":77607260,"series":[[1793183280,0.0584], …]}
 ```
 
-`series` = `[secondes, prix USD]` croissants (une minute d'écart en 1d) ; `change` en pourcent sur la période ;
+`series` = `[secondes, prix USD]` croissants (une minute d'écart en 1d) ; `change` en pourcent sur 24 h, le même quelle que soit la période (vérifié sur le site le 2026-10-29) ;
 `cap` en USD. Le site propose 1d / 7d / 30d. Une erreur : le site écrit « prices are busy — trying again » et réessaie
 (4 s puis 20 s, 8 fois au plus). Moins de 2 points : pas de graphique.
 
