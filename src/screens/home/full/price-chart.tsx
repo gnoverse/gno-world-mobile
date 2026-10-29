@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Line, Path, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import type { PriceDays, Prices } from '@/offchain/home';
 import { colors } from '@/theme';
 
 import { formatPrice, niceTicks, priceScale, timeTicks } from '../format';
+import { useCrosshair } from './use-crosshair';
 
 const AXIS_W = 46; // the price labels on the right
 const TIME_H = 18; // the time labels at the bottom
@@ -14,8 +15,13 @@ const VOL_SHARE = 0.2; // volume bars take the bottom fifth, under the line (the
 
 const axisLabel = (p: number) => formatPrice(p).slice(1);
 
-/** The full-screen price chart: line and area, price axis right, time axis below, volume bars at the bottom. */
-export function PriceChart({ data, days, color }: { data: Prices; days: PriceDays; color: string }) {
+/**
+ * The full-screen price chart: line and area, price axis right, time axis below, volume bars at the bottom. Hold and
+ * slide to pick a point: `onPick` gets its index (null when the finger lifts), `picked` draws the crosshair on it.
+ */
+export function PriceChart({ data, days, color, picked = null, onPick }: {
+  data: Prices; days: PriceDays; color: string; picked?: number | null; onPick?(i: number | null): void;
+}) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const drawn = useMemo(() => {
     const { width, height } = size;
@@ -39,11 +45,14 @@ export function PriceChart({ data, days, color }: { data: Prices; days: PriceDay
     const times = timeTicks(data.series[0][0], data.series[data.series.length - 1][0], days);
     return { scale, line, area, bars, barW, prices, times, right, bottom };
   }, [size, data, days]);
+  const { responder } = useCrosshair({ onPick: (px) => onPick?.(px === null || !drawn ? null : drawn.scale.nearestIndex(px)) });
+  const point = drawn && picked !== null ? data.series[picked] : undefined;
 
   return (
-    <View testID="full-chart" style={styles.box} onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
+    <View testID="full-chart" style={styles.box} onLayout={(e) => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })} {...responder}>
       {drawn && (
-        <Svg width={size.width} height={size.height}>
+        // touches go to the view, so the finger's x is in the view's frame
+        <Svg width={size.width} height={size.height} pointerEvents="none">
           {drawn.prices.map((p) => (
             <Line key={`g${p}`} x1={0} x2={drawn.right} y1={drawn.scale.y(p)} y2={drawn.scale.y(p)} stroke="#ffffff10" />
           ))}
@@ -56,6 +65,15 @@ export function PriceChart({ data, days, color }: { data: Prices; days: PriceDay
           <Path testID="vol-bars" d={drawn.bars} stroke={color} strokeOpacity={0.35} strokeWidth={drawn.barW} />
           <Path d={drawn.area} fill={color} fillOpacity={0.08} />
           <Path d={drawn.line} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+          {point && (
+            <>
+              <Line x1={drawn.scale.x(point[0])} x2={drawn.scale.x(point[0])} y1={TOP} y2={drawn.bottom} stroke={colors.fg} strokeOpacity={0.6} strokeDasharray="3 3" />
+              <Line x1={0} x2={drawn.right} y1={drawn.scale.y(point[1])} y2={drawn.scale.y(point[1])} stroke={colors.fg} strokeOpacity={0.6} strokeDasharray="3 3" />
+              <Circle cx={drawn.scale.x(point[0])} cy={drawn.scale.y(point[1])} r={4} fill={color} />
+              <Rect x={drawn.right} y={drawn.scale.y(point[1]) - 8} width={AXIS_W} height={16} rx={3} fill={colors.fg} />
+              <SvgText x={drawn.right + 4} y={drawn.scale.y(point[1]) + 4} fill={colors.bg} fontSize={10}>{axisLabel(point[1])}</SvgText>
+            </>
+          )}
         </Svg>
       )}
     </View>

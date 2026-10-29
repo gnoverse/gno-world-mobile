@@ -1,11 +1,13 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { useEffect as mockUseEffect } from 'react';
 
 import PriceRoute from '@/app/home/price';
+import { readoutText } from '@/screens/home/format';
 import { PriceFull } from '@/screens/home/full/price-full';
 
 let mockParams: Record<string, string> = {};
+const mockSetOptions = jest.fn();
 let mockPrices: Record<string, unknown>;
 const mockGet = jest.fn(async (path: string): Promise<unknown> => {
   if (path.startsWith('/api/prices')) return mockPrices;
@@ -16,7 +18,7 @@ jest.mock('expo-router', () => ({
   router: { back: jest.fn(), push: jest.fn() },
   useFocusEffect: (cb: () => void | (() => void)) => mockUseEffect(cb, [cb]),
   useLocalSearchParams: () => mockParams,
-  useNavigation: () => ({ setOptions: jest.fn() }),
+  useNavigation: () => ({ setOptions: mockSetOptions }),
 }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('@/state/app-services', () => ({ useServices: () => ({ offchain: { get: mockGet } }) }));
@@ -77,4 +79,26 @@ test('the volume bars: one stroke per point that traded', async () => {
   expect(await screen.findByText('$0.0583')).toBeTruthy();
   await fireEvent(screen.getByTestId('full-chart'), 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 300 } } });
   expect(screen.getByTestId('vol-bars').props.d.match(/M/g)).toHaveLength(2);
+});
+
+test('hold and slide on the chart: the moment is read out, and the sheet stays put meanwhile', async () => {
+  jest.useFakeTimers();
+  try {
+    await render(<PriceFull initialDays={1} />);
+    expect(await screen.findByText('$0.0583')).toBeTruthy();
+    const chart = screen.getByTestId('full-chart');
+    await fireEvent(chart, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 300 } } });
+    const at = (x: number) => ({ nativeEvent: { locationX: x, locationY: 100, pageX: x, pageY: 100 } });
+    mockSetOptions.mockClear();
+    await fireEvent(chart, 'responderGrant', at(150));
+    await act(async () => void jest.advanceTimersByTime(200));
+    await fireEvent(chart, 'responderMove', at(0));
+    expect(screen.getByText(readoutText(1, 0.06, 100))).toBeTruthy();
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: false });
+    await fireEvent(chart, 'responderRelease', at(0));
+    expect(screen.queryByText(readoutText(1, 0.06, 100))).toBeNull();
+    expect(mockSetOptions).toHaveBeenLastCalledWith({ gestureEnabled: true });
+  } finally {
+    jest.useRealTimers();
+  }
 });
