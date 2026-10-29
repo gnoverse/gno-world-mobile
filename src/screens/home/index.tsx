@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet } from 'react-native';
 
-import { fetchPrices, fetchWhere, type PriceDays } from '@/offchain/home';
+import { fetchPrices, fetchWhere, PRICES_EVERY_MS, WHERE_EVERY_MS, type PriceDays } from '@/offchain/home';
 import { useServices } from '@/state/app-services';
 import { colors, space } from '@/theme';
 
@@ -10,13 +10,10 @@ import { HereCard } from './here-card';
 import { PriceCard } from './price-card';
 import { usePoll } from './use-poll';
 
-const PRICE_EVERY_MS = 300000; // as the site's hereStatPaint
-const WHERE_EVERY_MS = 20000; // the presence heartbeat's rhythm
-
 export function HomeScreen() {
   const { offchain } = useServices();
   const [days, setDays] = useState<PriceDays>(1);
-  const prices = usePoll(() => fetchPrices(offchain, days), PRICE_EVERY_MS, String(days));
+  const prices = usePoll(() => fetchPrices(offchain, days), PRICES_EVERY_MS, String(days));
   const where = usePoll(() => fetchWhere(offchain), WHERE_EVERY_MS);
   const [refreshing, setRefreshing] = useState(false);
 

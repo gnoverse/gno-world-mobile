@@ -2,7 +2,7 @@ import { router, useNavigation } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { fetchPrices, type PriceDays, type Prices } from '@/offchain/home';
+import { fetchPrices, PRICES_EVERY_MS, type PriceDays, type Prices } from '@/offchain/home';
 import { useServices } from '@/state/app-services';
 import { colors, space } from '@/theme';
 
@@ -12,7 +12,6 @@ import { usePoll } from '../use-poll';
 import { FullHeader } from './full-header';
 import { PriceChart } from './price-chart';
 
-const PRICE_EVERY_MS = 300000; // as the card and the site
 // the site's chart colours (priceDraw), by the sign of the change
 const UP = '#3ddc84';
 const DOWN = '#ff7676';
@@ -35,7 +34,7 @@ function figures(p: Prices, days: PriceDays): [string, string][] {
 export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
   const { offchain } = useServices();
   const [days, setDays] = useState<PriceDays>(initialDays);
-  const prices = usePoll(() => fetchPrices(offchain, days), PRICE_EVERY_MS, String(days));
+  const prices = usePoll(() => fetchPrices(offchain, days), PRICES_EVERY_MS, String(days));
   const p = prices.data;
   // as the card: no price, or fewer than 2 points, is no prices at all
   const shown = p && p.now !== null && p.series.length >= 2 ? { ...p, now: p.now } : null;

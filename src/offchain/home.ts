@@ -4,6 +4,10 @@ import type { Offchain } from './http';
 export type PriceDays = 1 | 7 | 30;
 export const PRICE_DAYS: PriceDays[] = [1, 7, 30];
 
+/** How often to load: prices as the site's hereStatPaint, presence at the heartbeat's rhythm. */
+export const PRICES_EVERY_MS = 300000;
+export const WHERE_EVERY_MS = 20000;
+
 export interface Prices {
   /** USD; null: the reply had no price (the site then says "no prices right now") */
   now: number | null;

@@ -27,6 +27,8 @@ export default function RootLayout() {
           <Stack.Screen name="session-callback" options={{ headerShown: false }} />
           {/* Home's cards, full screen: an iOS sheet you swipe down to close */}
           <Stack.Screen name="home/price" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="home/here" options={{ presentation: 'modal', headerShown: false }} />
+          <Stack.Screen name="home/chat" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
       </AppServices>
     </GnoNativeProvider>

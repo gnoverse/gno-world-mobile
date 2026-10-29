@@ -6,7 +6,7 @@ import type { Where } from '@/offchain/home';
 import { colors, space } from '@/theme';
 import { flagEmoji } from '@/utils/flag';
 
-import { hereRows, hereText } from './format';
+import { hereRows, hereText, type HereRow } from './format';
 import { CARD_HEIGHT } from './layout';
 
 export function HereCard({ data, failed }: { data: Where | null; failed: boolean }) {
@@ -27,18 +27,26 @@ export function HereCard({ data, failed }: { data: Where | null; failed: boolean
         nestedScrollEnabled
         onContentSizeChange={() => list.current?.flashScrollIndicators()}>
         {rows.map((r) => (
-          <View key={r.cc || r.name} style={styles.row}>
-            <Text style={styles.flag}>{r.cc ? flagEmoji(r.cc) : '·'}</Text>
-            <Text style={styles.name} numberOfLines={1}>{r.name}</Text>
-            <View style={styles.barBox}>{r.share !== null && <View style={[styles.bar, { width: `${Math.round(r.share * 100)}%` }]} />}</View>
-            <Text style={styles.n}>{r.n}</Text>
-          </View>
+          <CountryRow key={r.cc || r.name} row={r} />
         ))}
         {data && !rows.length && <Text style={styles.muted}>nobody yet</Text>}
         {!data && !failed && <Text style={styles.muted}>loading…</Text>}
         {failed && <Text style={styles.muted}>{data ? 'could not refresh — trying again' : 'server unreachable — trying again'}</Text>}
       </ScrollView>
     </Card>
+  );
+}
+
+/** A line of the table; with `total`, each line also says its share of everyone here. */
+export function CountryRow({ row, total }: { row: HereRow; total?: number }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.flag}>{row.cc ? flagEmoji(row.cc) : '·'}</Text>
+      <Text style={styles.name} numberOfLines={1}>{row.name}</Text>
+      <View style={styles.barBox}>{row.share !== null && <View style={[styles.bar, { width: `${Math.round(row.share * 100)}%` }]} />}</View>
+      <Text style={styles.n}>{row.n}</Text>
+      {total ? <Text style={styles.pc}>{Math.round((row.n / total) * 100)}%</Text> : null}
+    </View>
   );
 }
 
@@ -55,5 +63,6 @@ const styles = StyleSheet.create({
   barBox: { flex: 1 },
   bar: { height: 6, borderRadius: 3, backgroundColor: colors.accent },
   n: { color: colors.muted, minWidth: 24, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  pc: { color: colors.muted, fontSize: 12, minWidth: 36, textAlign: 'right', fontVariant: ['tabular-nums'] },
   muted: { color: colors.muted, fontSize: 12 },
 });
