@@ -42,6 +42,10 @@ lecture seule.
   iOS, une feuille quasi plein écran qui se ferme en la glissant vers le bas ; sur Android, ✕ et le bouton retour du
   système. Chaque vue a un ✕ en haut à droite. *(Mon choix : `modal` plutôt que `fullScreenModal`, qui n'offre pas le
   glissement ; si tu veux vraiment tout l'écran, c'est une option à changer.)*
+  **Sauf GNOT, en `fullScreenModal`** (décidé à la revue, 2026-10-29) : sur le simulateur iOS, une feuille — même
+  verrouillée (`gestureEnabled: false`) — se laisse tirer vers le bas dès qu'un doigt glisse un peu vers le bas sur le
+  graphique, et prend le toucher au réticule. La vue GNOT couvre donc tout l'écran et se ferme par ✕ (et le retour
+  Android) ; Here Now et Chat restent des feuilles.
 - **Carte GNOT** : toucher la carte hors des boutons de période ouvre le plein écran ; les boutons 1d / 7d / 30d
   gardent leur rôle sur la carte. Le plein écran s'ouvre sur la période de la carte ; y changer de période ne change
   pas la carte d'Accueil. *(Mon choix.)*
@@ -80,8 +84,8 @@ De haut en bas :
    - barres de volume dans le bas du graphique (environ le cinquième de sa hauteur), même couleur atténuée ;
    - **réticule** : tenir le doigt sur le graphique (appui long court) puis glisser horizontalement ; il suit le point
      le plus proche, avec une ligne verticale et une horizontale en pointillés, un point sur la courbe, le cours dans
-     une étiquette sur l'axe de droite. Lever le doigt l'efface et la ligne de lecture se vide. Tant que le réticule est
-     actif, le glissement ne ferme pas la feuille (par exemple `gestureEnabled` coupé pendant l'appui). *(Mon choix.)*
+     une étiquette sur l'axe de droite. Lever le doigt l'efface et la ligne de lecture se vide. La vue GNOT n'étant pas
+     une feuille (§3), rien ne dispute le doigt au réticule.
 4. **Chiffres** en grille de deux colonnes : fdv, market cap, supply (« 1.33B GNOT »), volume de la période (somme de
    `volumes`), plus haut et plus bas de la période. Un chiffre absent ou nul du serveur n'est pas affiché.
 

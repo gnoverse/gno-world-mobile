@@ -17,11 +17,16 @@ export function useBottomGap(): number {
 }
 
 /** The top of a full-screen card: its name, what it puts on the right, and ✕. */
-export function FullHeader({ title, right, onClose = closeFull }: { title: string; right?: ReactNode; onClose?(): void }) {
+export function FullHeader({ title, right, onClose = closeFull, sheet = true }: {
+  title: string; right?: ReactNode; onClose?(): void;
+  /** shown as an iOS sheet, which starts below the status bar; false for a modal over the whole screen */
+  sheet?: boolean;
+}) {
   const insets = useSafeAreaInsets();
+  // Android's modals cover the whole screen
+  const top = Platform.OS === 'android' || !sheet ? insets.top : 0;
   return (
-    // an iOS sheet starts below the status bar; Android's modal covers the whole screen
-    <View style={[styles.head, { paddingTop: (Platform.OS === 'android' ? insets.top : 0) + space.m }]}>
+    <View style={[styles.head, { paddingTop: top + space.m }]}>
       <Text style={styles.title}>{title}</Text>
       <View style={styles.right}>
         {right}

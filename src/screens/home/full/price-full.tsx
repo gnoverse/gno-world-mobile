@@ -1,5 +1,4 @@
-import { useNavigation } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
 import { fetchPrices, PRICES_EVERY_MS, type PriceDays, type Prices } from '@/offchain/home';
@@ -42,14 +41,11 @@ export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
   const [picked, setPicked] = useState<number | null>(null);
   const point = shown && picked !== null ? shown.series[picked] : undefined;
   const vol = point && shown?.volumes.find(([t]) => t === point[0]);
-  // while a finger reads the chart, sliding it down must not close the sheet
-  const navigation = useNavigation();
   const bottom = useBottomGap();
-  const reading = point !== undefined;
-  useEffect(() => navigation.setOptions({ gestureEnabled: !reading }), [navigation, reading]);
   return (
     <View testID="full-root" style={[styles.root, { paddingBottom: bottom }]}>
-      <FullHeader title="GNOT" right={<Periods days={days} onDays={setDays} />} />
+      {/* over the whole screen, not a sheet: see app/_layout */}
+      <FullHeader title="GNOT" right={<Periods days={days} onDays={setDays} />} sheet={false} />
       {shown ? (
         <>
           <View style={styles.now}>
