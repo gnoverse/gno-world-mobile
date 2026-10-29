@@ -47,6 +47,19 @@ describe('PriceCard', () => {
     expect(screen.getByText('loading…')).toBeTruthy();
   });
 
+  test('while another period loads, the price stays and the old chart dims', async () => {
+    await render(<PriceCard data={PRICES} stale failed={false} days={30} onDays={jest.fn()} />);
+    for (const t of ['$0.0582', '−0.31%', 'cap $11.5M']) expect(screen.getByText(t)).toBeTruthy();
+    expect(screen.getByTestId('price-chart-box').props.accessibilityState).toMatchObject({ busy: true });
+    expect(screen.queryByText('loading…')).toBeNull();
+  });
+
+  test('while another period loads after no prices, the card says loading, not no prices', async () => {
+    await render(<PriceCard data={{ ...PRICES, now: null }} stale failed={false} days={30} onDays={jest.fn()} />);
+    expect(screen.getByText('loading…')).toBeTruthy();
+    expect(screen.queryByText('no prices right now')).toBeNull();
+  });
+
   test('one point is no chart, and no prices as the site says it', async () => {
     await render(<PriceCard data={{ ...PRICES, series: [[1, 2]] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.queryByTestId('price-chart')).toBeNull();

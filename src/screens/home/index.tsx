@@ -34,7 +34,7 @@ export function HomeScreen() {
           }}
         />
       }>
-      <PriceCard data={prices.data} failed={prices.failed} days={days} onDays={setDays} />
+      <PriceCard data={prices.data} stale={prices.stale} failed={prices.failed} days={days} onDays={setDays} />
       <HereCard data={where.data} failed={where.failed} />
       <ChatCard />
     </ScrollView>

@@ -12,7 +12,20 @@ const CHART_HEIGHT = 80;
 const BUSY = 'prices are busy — trying again'; // the site's words
 const NONE = 'no prices right now'; // the site's words for a reply without prices (priceLoad)
 
-export function PriceCard({ data, failed, days, onDays }: { data: Prices | null; failed: boolean; days: PriceDays; onDays(d: PriceDays): void }) {
+export function PriceCard({
+  data,
+  stale = false,
+  failed,
+  days,
+  onDays,
+}: {
+  data: Prices | null;
+  /** data is another period's, this one's is loading: the price holds (the same whatever the period), the chart dims */
+  stale?: boolean;
+  failed: boolean;
+  days: PriceDays;
+  onDays(d: PriceDays): void;
+}) {
   const [width, setWidth] = useState(0);
   // as the site: no price, or fewer than 2 points, is no prices at all — never a $0
   const shown = data && data.now !== null && data.series.length >= 2 ? { ...data, now: data.now } : null;
@@ -41,7 +54,11 @@ export function PriceCard({ data, failed, days, onDays }: { data: Prices | null;
           <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
         </View>
       )}
-      <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <View
+        testID="price-chart-box"
+        accessibilityState={{ busy: stale }}
+        style={stale && styles.stale}
+        onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
         {geom && (
           <>
             <Text style={styles.small}>{formatPrice(geom.max)}</Text>
@@ -53,8 +70,8 @@ export function PriceCard({ data, failed, days, onDays }: { data: Prices | null;
         )}
       </View>
       {shown && shown.cap > 0 && <Text style={styles.small}>{formatCap(shown.cap)}</Text>}
-      {data && !shown && <Text style={styles.small}>{NONE}</Text>}
-      {!data && !failed && <Text style={styles.small}>loading…</Text>}
+      {data && !shown && !stale && <Text style={styles.small}>{NONE}</Text>}
+      {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
       {failed && <Text style={styles.small}>{BUSY}</Text>}
     </Card>
   );
@@ -71,4 +88,5 @@ const styles = StyleSheet.create({
   now: { flexDirection: 'row', alignItems: 'baseline', gap: space.s },
   price: { color: colors.fg, fontSize: 24, fontWeight: '600' },
   small: { color: colors.muted, fontSize: 11 },
+  stale: { opacity: 0.4 },
 });

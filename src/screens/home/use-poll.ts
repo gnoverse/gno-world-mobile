@@ -11,6 +11,8 @@ export interface Poll<T> {
   data: T | null;
   /** the last load failed (data, if any, is older) */
   failed: boolean;
+  /** data is the previous key's: this key's first reply is still on its way */
+  stale: boolean;
   refresh(): Promise<void>;
 }
 
@@ -81,8 +83,8 @@ function createPoller<T>(show: (s: Shown<T>) => void) {
 }
 
 /**
- * Loads every `everyMs` while the screen is focused and the app active, at once when the data is older than that. A change of `key` drops the data and
- * loads at once; a late reply for an older key is ignored.
+ * Loads every `everyMs` while the screen is focused and the app active, at once when the data is older than that. A change
+ * of `key` loads at once and keeps the old key's data, marked stale, until the reply; a late reply for an older key is ignored.
  */
 export function usePoll<T>(load: () => Promise<T>, everyMs: number, key = ''): Poll<T> {
   const [shown, setShown] = useState<Shown<T>>({ key, data: null, failed: false });
@@ -103,7 +105,6 @@ export function usePoll<T>(load: () => Promise<T>, everyMs: number, key = ''): P
   );
 
   const refresh = useCallback(() => poller.start(key, true), [poller, key]);
-  // data of another key says nothing about this one
   const mine = shown.key === key;
-  return { data: mine ? shown.data : null, failed: mine && shown.failed, refresh };
+  return { data: shown.data, stale: !mine && shown.data !== null, failed: mine && shown.failed, refresh };
 }

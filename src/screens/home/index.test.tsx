@@ -7,11 +7,12 @@ import { createChatStore } from '@/offchain/chat/store';
 import { HomeScreen } from '@/screens/home';
 
 let mockChat: ReturnType<typeof createChatStore>;
-const mockGet = jest.fn(async (path: string): Promise<unknown> => {
+const serve = async (path: string): Promise<unknown> => {
   if (path.startsWith('/api/prices')) return { now: 0.05822, change: -0.308, cap: 11487970.4, series: [[1, 0.0584], [2, 0.0583]] };
   if (path === '/api/where') return { by_country: [{ cc: 'FR', n: 3 }], count: 18, elsewhere: 0, geo: true };
   throw new Error(`unexpected ${path}`);
-});
+};
+const mockGet = jest.fn(serve);
 
 jest.mock('expo-router', () => ({
   router: { navigate: jest.fn() },
@@ -23,7 +24,7 @@ jest.mock('@/state/app-services', () => ({
 }));
 
 beforeEach(async () => {
-  mockGet.mockClear();
+  mockGet.mockClear().mockImplementation(serve);
   mockChat = createChatStore({
     client: {} as never,
     identity: { load: async () => NO_IDENTITY, save: async () => NO_IDENTITY },
@@ -50,4 +51,14 @@ test('pulling down reloads the prices and who is here, fresh as they are', async
   await act(() => scroll.props.refreshControl.props.onRefresh());
   expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=1');
   expect(mockGet).toHaveBeenCalledWith('/api/where');
+});
+
+test('switching period keeps the price while the new chart loads', async () => {
+  await render(<HomeScreen />);
+  expect(await screen.findByText('$0.0582')).toBeTruthy();
+  mockGet.mockImplementation((p) => (p.includes('days=30') ? new Promise(() => {}) : serve(p)));
+  await fireEvent.press(screen.getByRole('button', { name: '30 days' }));
+  expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=30');
+  expect(screen.getByText('$0.0582')).toBeTruthy();
+  expect(screen.getByText('cap $11.5M')).toBeTruthy();
 });

@@ -67,23 +67,24 @@ test('retries 4 s then 20 s, 8 times, then the normal interval', async () => {
   expect(load).toHaveBeenCalledTimes(10);
 });
 
-test('a new key drops the data and ignores the late reply of the old key', async () => {
-  const pending: Record<string, (v: string) => void> = {};
+test('a new key keeps the old data, stale, until its own reply; a late reply of an older load is ignored', async () => {
+  const pending: ((v: string) => void)[] = [];
   const { result, rerender } = await renderHook(
-    ({ k }: { k: string }) => usePoll(() => new Promise<string>((r) => (pending[k] = r)), 300000, k),
+    ({ k }: { k: string }) => usePoll(() => new Promise<string>((r) => void pending.push(r)), 300000, k),
     { initialProps: { k: '1' } },
   );
-  await act(async () => pending['1']('first'));
-  expect(result.current.data).toBe('first');
+  await act(async () => pending[0]('first'));
+  expect(result.current).toMatchObject({ data: 'first', stale: false });
   await rerender({ k: '7' });
-  expect(result.current.data).toBeNull();
-  const old = pending['1'];
-  await rerender({ k: '1' });
+  expect(result.current).toMatchObject({ data: 'first', stale: true });
+  await rerender({ k: '1' }); // back to fresh data: shown as is, not loaded again
+  expect(result.current).toMatchObject({ data: 'first', stale: false });
   await rerender({ k: '7' }); // a second load of '7' is now the one that counts
-  await act(async () => old('old'));
-  expect(result.current.data).toBeNull();
-  await act(async () => pending['7']('new'));
-  expect(result.current.data).toBe('new');
+  expect(pending).toHaveLength(3);
+  await act(async () => pending[1]('old'));
+  expect(result.current).toMatchObject({ data: 'first', stale: true });
+  await act(async () => pending[2]('new'));
+  expect(result.current).toMatchObject({ data: 'new', stale: false });
 });
 
 test('stops in the background and on unmount, starts again when active', async () => {
