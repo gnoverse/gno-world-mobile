@@ -26,6 +26,7 @@ function createPoller<T>(show: (s: Shown<T>) => void) {
   let everyMs = 60000;
   let key = '';
   let last: Shown<T> = { key: '', data: null, failed: false };
+  let at = 0; // when last.data came
   let gen = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let fails = 0;
@@ -43,6 +44,7 @@ function createPoller<T>(show: (s: Shown<T>) => void) {
       if (g !== gen) return;
       ok = true;
       fails = 0;
+      at = Date.now();
       last = { key: k, data, failed: false };
     } catch {
       if (g !== gen) return;
@@ -54,10 +56,18 @@ function createPoller<T>(show: (s: Shown<T>) => void) {
     if (fails > RETRY_MAX) fails = 0;
     timer = setTimeout(() => void run(g), wait);
   };
-  const start = (k: string) => {
+  /** `force`: load even data still fresh (pull to refresh) */
+  const start = (k: string, force = false) => {
     stop(); // never two chains (e.g. 'active' reported twice)
     key = k;
     fails = 0;
+    // fresh data waits for its turn: coming back to Home is not a reason to load (the site loads prices every 5 min)
+    const age = Date.now() - at;
+    if (!force && last.key === k && last.data !== null && !last.failed && age < everyMs) {
+      const g = gen;
+      timer = setTimeout(() => void run(g), everyMs - age);
+      return Promise.resolve();
+    }
     return run(gen);
   };
   return {
@@ -71,7 +81,7 @@ function createPoller<T>(show: (s: Shown<T>) => void) {
 }
 
 /**
- * Loads now and every `everyMs` while the screen is focused and the app active. A change of `key` drops the data and
+ * Loads every `everyMs` while the screen is focused and the app active, at once when the data is older than that. A change of `key` drops the data and
  * loads at once; a late reply for an older key is ignored.
  */
 export function usePoll<T>(load: () => Promise<T>, everyMs: number, key = ''): Poll<T> {
@@ -92,7 +102,7 @@ export function usePoll<T>(load: () => Promise<T>, everyMs: number, key = ''): P
     }, [poller, key]), // a new key starts a new chain
   );
 
-  const refresh = useCallback(() => poller.start(key), [poller, key]);
+  const refresh = useCallback(() => poller.start(key, true), [poller, key]);
   // data of another key says nothing about this one
   const mine = shown.key === key;
   return { data: mine ? shown.data : null, failed: mine && shown.failed, refresh };

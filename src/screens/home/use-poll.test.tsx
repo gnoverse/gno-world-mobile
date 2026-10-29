@@ -4,10 +4,18 @@ import { AppState, type AppStateStatus } from 'react-native';
 
 import { usePoll } from '@/screens/home/use-poll';
 
-// focus = mounted: the callback runs in an effect and its cleanup on unmount
+// focus = mounted unless a test blurs: the callback runs in an effect, its cleanup on blur or unmount
+const mockFocus: { cb?: () => void | (() => void); cleanup?: void | (() => void) } = {};
 jest.mock('expo-router', () => ({
-  useFocusEffect: (cb: () => void | (() => void)) => mockUseEffect(cb, [cb]),
+  useFocusEffect: (cb: () => void | (() => void)) =>
+    mockUseEffect(() => {
+      mockFocus.cb = cb;
+      mockFocus.cleanup = cb();
+      return () => mockFocus.cleanup?.();
+    }, [cb]),
 }));
+const blur = () => act(async () => void (mockFocus.cleanup?.(), (mockFocus.cleanup = undefined)));
+const focus = () => act(async () => void (mockFocus.cleanup = mockFocus.cb?.()));
 
 let appListener: (s: AppStateStatus) => void;
 beforeEach(() => {
@@ -87,12 +95,12 @@ test('stops in the background and on unmount, starts again when active', async (
   expect(load).toHaveBeenCalledTimes(1);
   await act(async () => appListener('active'));
   expect(load).toHaveBeenCalledTimes(2);
-  await act(async () => appListener('active')); // reported twice: still one chain
+  await act(async () => appListener('active')); // reported twice: still one chain, and no reload of fresh data
   await tick(20000);
-  expect(load).toHaveBeenCalledTimes(4);
+  expect(load).toHaveBeenCalledTimes(3);
   await unmount();
   await tick(60000);
-  expect(load).toHaveBeenCalledTimes(4);
+  expect(load).toHaveBeenCalledTimes(3);
 });
 
 test('refresh loads now and resolves when done', async () => {
@@ -101,4 +109,23 @@ test('refresh loads now and resolves when done', async () => {
   await act(() => result.current.refresh());
   expect(load).toHaveBeenCalledTimes(2);
   expect(result.current.data).toBe('b');
+});
+
+test('leaving Home stops the loads; coming back reloads only data older than everyMs, as the site does', async () => {
+  const load = jest.fn(async () => 'a');
+  const { result } = await renderHook(() => usePoll(load, 300000));
+  await blur();
+  await tick(60000);
+  expect(load).toHaveBeenCalledTimes(1);
+  await focus();
+  expect(load).toHaveBeenCalledTimes(1);
+  expect(result.current.data).toBe('a');
+  await tick(239999);
+  expect(load).toHaveBeenCalledTimes(1);
+  await tick(1);
+  expect(load).toHaveBeenCalledTimes(2);
+  await blur();
+  await tick(300000);
+  await focus();
+  expect(load).toHaveBeenCalledTimes(3);
 });

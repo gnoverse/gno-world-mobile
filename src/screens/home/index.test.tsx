@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useEffect as mockUseEffect } from 'react';
 import { useStore as mockUseStore } from 'zustand';
 
@@ -40,4 +40,14 @@ test('Home shows the price, who is here and the chat; a period asks for its pric
   expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=1');
   await fireEvent.press(screen.getByRole('button', { name: '30 days' }));
   expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=30');
+});
+
+test('pulling down reloads the prices and who is here, fresh as they are', async () => {
+  const view = await render(<HomeScreen />);
+  expect(await screen.findByText('18 people')).toBeTruthy();
+  mockGet.mockClear();
+  const [scroll] = view.container.queryAll((n) => n.props.refreshControl);
+  await act(() => scroll.props.refreshControl.props.onRefresh());
+  expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=1');
+  expect(mockGet).toHaveBeenCalledWith('/api/where');
 });
