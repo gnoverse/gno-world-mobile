@@ -23,3 +23,8 @@ test('no places, no dots', async () => {
   expect(screen.queryAllByTestId('map-spot')).toHaveLength(0);
   expect(screen.getByTestId('map-land')).toBeTruthy();
 });
+
+test('a crowded place does not cover its region', async () => {
+  await render(<WorldMap width={360} spots={[{ cc: 'FR', lat: 48.5, lon: 1.5, n: 100 }]} />);
+  expect(Number(screen.getByTestId('map-spot').props.r)).toBeLessThanOrEqual(6);
+});

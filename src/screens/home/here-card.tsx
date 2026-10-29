@@ -29,10 +29,10 @@ export function HereCard({ data, failed, onOpen }: { data: Where | null; failed:
         ref={list}
         testID="here-rows"
         style={styles.rows}
-        contentContainerStyle={styles.rowsIn}
+        contentContainerStyle={styles.rowsGrow}
         nestedScrollEnabled
         onContentSizeChange={() => list.current?.flashScrollIndicators()}>
-        <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => [styles.rowsIn, pressed && styles.pressed]}>
+        <Pressable testID="here-rows-press" accessible={false} onPress={onOpen} style={({ pressed }) => [styles.rowsIn, pressed && styles.pressed]}>
           {rows.map((r) => (
             <CountryRow key={r.cc || r.name} row={r} />
           ))}
@@ -66,7 +66,9 @@ const styles = StyleSheet.create({
   label: { color: colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
   total: { color: colors.fg, flexShrink: 1, textAlign: 'right' },
   rows: { flex: 1 },
-  rowsIn: { gap: space.s, paddingRight: space.s }, // the scroll bar clear of the counts
+  // the press area fills the list, so the room under a short table opens the card too
+  rowsGrow: { flexGrow: 1 },
+  rowsIn: { flexGrow: 1, gap: space.s, paddingRight: space.s }, // the scroll bar clear of the counts
   row: { flexDirection: 'row', alignItems: 'center', gap: space.s },
   flag: { width: 22, textAlign: 'center', color: colors.muted },
   name: { color: colors.fg, width: 110 },

@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useStore as mockUseStore } from 'zustand';
 
@@ -16,7 +17,7 @@ jest.mock('@/state/app-services', () => ({
   useChat: <T,>(sel: (s: ReturnType<typeof mockChat.getState>) => T) => mockUseStore(mockChat, sel),
 }));
 
-const PRICES: Prices = { now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 77713900, supply: 0, series: [[1793183280, 0.0584], [1793183340, 0.0583]], volumes: [] };
+const PRICES: Prices = { days: 1, now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 77713900, supply: 0, series: [[1793183280, 0.0584], [1793183340, 0.0583]], volumes: [] };
 const WHERE: Where = { count: 18, byCountry: [{ cc: 'FR', n: 3 }, { cc: 'AU', n: 1 }], elsewhere: 2, geo: true, spots: [] };
 
 const layout = (el: Parameters<typeof fireEvent>[0], width: number, height: number) =>
@@ -93,7 +94,7 @@ describe('PriceCard', () => {
   });
 
   test('a reply without a price never shows $0', async () => {
-    await render(<PriceCard data={{ now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [], volumes: [] }} failed={false} days={1} onDays={jest.fn()} />);
+    await render(<PriceCard data={{ days: 1, now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [], volumes: [] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.getByText('no prices right now')).toBeTruthy();
     expect(screen.queryByText(/^\$0/)).toBeNull();
     expect(screen.queryByText(/^(fdv|mc) /)).toBeNull();
@@ -138,6 +139,13 @@ describe('HereCard', () => {
     expect(within(rows).getByText('France')).toBeTruthy();
     expect(within(rows).getByText('Japan')).toBeTruthy();
     expect(rows.props.nestedScrollEnabled).toBe(true); // without it, Android does not scroll a list inside the page
+  });
+
+  test('the rows are padded once, and the empty room under a short table opens the card too', async () => {
+    await render(<HereCard data={WHERE} failed={false} onOpen={jest.fn()} />);
+    const list = screen.getByTestId('here-rows');
+    expect(StyleSheet.flatten(list.props.contentContainerStyle)).toEqual({ flexGrow: 1 });
+    expect(StyleSheet.flatten(screen.getByTestId('here-rows-press').props.style)).toMatchObject({ flexGrow: 1, paddingRight: 8 });
   });
 
   test('nobody yet when the table is empty', async () => {

@@ -139,3 +139,72 @@ test('opened from a link with nothing behind, ✕ goes to Home', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Close' }));
   expect(router.replace).toHaveBeenCalledWith('/');
 });
+
+const hold = async (x: number) => {
+  const chart = screen.getByTestId('full-chart');
+  await fireEvent(chart, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 300 } } });
+  const at = (px: number) => ({ nativeEvent: { locationX: px, locationY: 100, pageX: px, pageY: 100 } });
+  await fireEvent(chart, 'responderGrant', at(x));
+  await act(async () => void jest.advanceTimersByTime(200));
+  return { move: (px: number) => fireEvent(chart, 'responderMove', at(px)) };
+};
+
+test('no period volume when nothing traded', async () => {
+  mockPrices = { ...mockPrices, volumes: [[1, 0], [2, 0], [3, 0]] };
+  await render(<PriceFull initialDays={1} />);
+  expect(await screen.findByText('$0.0583')).toBeTruthy();
+  expect(screen.queryByText('1d volume')).toBeNull();
+});
+
+test('the readout finds a point\'s volume when the server lists one per point, even at slightly other times', async () => {
+  jest.useFakeTimers();
+  try {
+    mockPrices = { ...mockPrices, volumes: [[11, 100], [12, 0], [13, 1100]] };
+    await render(<PriceFull initialDays={1} />);
+    expect(await screen.findByText('$0.0583')).toBeTruthy();
+    await hold(0);
+    expect(screen.getByText(readoutText(1, 0.06, 100))).toBeTruthy();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('a point the volumes do not cover says nothing of volume', async () => {
+  jest.useFakeTimers();
+  try {
+    mockPrices = { ...mockPrices, volumes: [[1, 100]] };
+    await render(<PriceFull initialDays={1} />);
+    expect(await screen.findByText('$0.0583')).toBeTruthy();
+    const h = await hold(0);
+    expect(screen.getByText(readoutText(1, 0.06, 100))).toBeTruthy();
+    await h.move(300);
+    expect(screen.getByText(readoutText(3, 0.0567, null))).toBeTruthy();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('new prices arriving under a held finger: no stale point, no crash', async () => {
+  jest.useFakeTimers();
+  try {
+    await render(<PriceFull initialDays={1} />);
+    expect(await screen.findByText('$0.0583')).toBeTruthy();
+    await hold(300);
+    expect(screen.getByText(readoutText(3, 0.0567, 1100))).toBeTruthy();
+    mockPrices = { ...mockPrices, now: 0.0584, series: [[4, 0.061], [5, 0.0584]], volumes: [] };
+    await act(async () => void jest.advanceTimersByTime(300000));
+    expect(await screen.findByText('$0.0610')).toBeTruthy(); // the new period high: the refresh arrived
+    expect(screen.queryByText(/ · \$0\.0567/)).toBeNull();
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+test('while another period loads, the figures keep the period they describe', async () => {
+  await render(<PriceFull initialDays={1} />);
+  expect(await screen.findByText('1d high')).toBeTruthy();
+  mockGet.mockImplementationOnce(() => new Promise(() => {}));
+  await fireEvent.press(screen.getByRole('button', { name: '30 days' }));
+  expect(screen.getByText('1d high')).toBeTruthy();
+  expect(screen.queryByText('30d high')).toBeNull();
+});

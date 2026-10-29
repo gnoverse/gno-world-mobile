@@ -8,8 +8,8 @@ import { LAND_PATH } from './world-land';
 // x = longitude, y = −latitude, from 84° N down to 60° S (no Antarctica)
 const VIEW = { x: -180, y: -84, w: 360, h: 144 };
 
-/** Radius in map degrees; the square root keeps a crowded place from covering its neighbours. */
-const radius = (n: number) => 1.5 + 1.5 * Math.sqrt(n);
+/** Radius in map degrees; the square root and the cap keep a crowded place from covering its neighbours. */
+const radius = (n: number) => Math.min(6, 1.5 + 1.5 * Math.sqrt(n));
 
 export function WorldMap({ spots, width }: { spots: Spot[]; width: number }) {
   return (

@@ -119,17 +119,19 @@ export function priceScale(series: [number, number][], box: { left: number; righ
   return { x, y, min, max, nearestIndex };
 }
 
-/** Round steps (1, 2 or 5 × 10^k) inside [min, max], about `count` of them. */
+/** Round steps (1, 2 or 5 × 10^k) inside [min, max]: the step whose number of ticks is nearest to `count`. */
 export function niceTicks(min: number, max: number, count: number): number[] {
   if (!(max > min)) return [min];
-  const rough = (max - min) / count;
-  const mag = 10 ** Math.floor(Math.log10(rough));
-  const n = rough / mag;
-  const step = (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
-  const digits = Math.max(0, -Math.floor(Math.log10(step)));
-  const ticks: number[] = [];
-  for (let v = Math.ceil(min / step) * step; v <= max + step / 1e6; v += step) ticks.push(Number(v.toFixed(digits)));
-  return ticks;
+  const mag = 10 ** Math.floor(Math.log10((max - min) / count));
+  const ticksOf = (step: number) => {
+    const digits = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+    const ticks: number[] = [];
+    for (let k = Math.ceil(min / step - 1e-9); k * step <= max + step * 1e-9; k++) ticks.push(Number((k * step).toFixed(digits)));
+    return ticks;
+  };
+  // fewer ticks first, so a tie keeps the axis light
+  const candidates = [10, 5, 2, 1, 0.5].map((f) => ticksOf(f * mag));
+  return candidates.reduce((best, t) => (Math.abs(t.length - count) < Math.abs(best.length - count) ? t : best));
 }
 
 /** Bottom axis labels: every 6 h for 1d, each midnight for 7d, every 7th midnight for 30d (local time). */

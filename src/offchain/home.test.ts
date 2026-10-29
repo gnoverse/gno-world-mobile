@@ -5,16 +5,16 @@ test('fetchPrices asks for gnot over the period and reads the reply', async () =
   const get = jest.fn(async () => ({ coin: 'gnot', now: 0.05822, change: -0.308, cap: 11487970.4, series: [[1793183280, 0.0584], [1793183340, 0.0583]] }));
   const oc = { get } as unknown as Offchain;
   expect(await fetchPrices(oc, 7)).toEqual({
-    now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 0, supply: 0, series: [[1793183280, 0.0584], [1793183340, 0.0583]], volumes: [],
+    days: 7, now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 0, supply: 0, series: [[1793183280, 0.0584], [1793183340, 0.0583]], volumes: [],
   });
   expect(get).toHaveBeenCalledWith('/api/prices?coin=gnot&days=7');
 });
 
 test('a reply without a price says so (null), never $0; only finite points are kept', async () => {
   const oc = { get: jest.fn(async () => ({ now: null, series: [[1, 2], ['x', 3], [4], [5, NaN], [6, 7]] })) } as unknown as Offchain;
-  expect(await fetchPrices(oc, 1)).toEqual({ now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [[1, 2], [6, 7]], volumes: [] });
+  expect(await fetchPrices(oc, 1)).toEqual({ days: 1, now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [[1, 2], [6, 7]], volumes: [] });
   const oc2 = { get: jest.fn(async () => 'nope') } as unknown as Offchain;
-  expect(await fetchPrices(oc2, 1)).toEqual({ now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [], volumes: [] });
+  expect(await fetchPrices(oc2, 1)).toEqual({ days: 1, now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [], volumes: [] });
 });
 
 test('fetchWhere reads count, countries, elsewhere and geo', async () => {

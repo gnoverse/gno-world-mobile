@@ -15,15 +15,26 @@ import { PriceChart } from './price-chart';
 const UP = '#3ddc84';
 const DOWN = '#ff7676';
 
+/** The volume of the i-th price point: one per point when the server lists as many (their times may differ a little),
+ * else by time; null when it has none. */
+function volumeLookup(p: Prices | null): (i: number) => number | null {
+  if (!p) return () => null;
+  const { series, volumes } = p;
+  if (volumes.length === series.length) return (i) => volumes[i][1];
+  const byTime = new Map(volumes);
+  return (i) => byTime.get(series[i][0]) ?? null;
+}
+
 /** The figures under the chart; one the server does not give (0) is left out. */
-function figures(p: Prices, days: PriceDays): [string, string][] {
+function figures(p: Prices): [string, string][] {
+  const days = p.days; // the period of the data shown: while another loads, still the old one's
   const prices = p.series.map(([, v]) => v);
   const vol = p.volumes.reduce((s, [, v]) => s + v, 0);
   const all: [string, string, number][] = [
     ['fdv', shortUsd(p.fdv), p.fdv],
     ['market cap', shortUsd(p.cap), p.cap],
     ['supply', `${shortNum(p.supply, 2)} GNOT`, p.supply],
-    [`${days}d volume`, shortUsd(vol), p.volumes.length],
+    [`${days}d volume`, shortUsd(vol), vol],
     [`${days}d high`, formatPrice(Math.max(...prices)), prices.length],
     [`${days}d low`, formatPrice(Math.min(...prices)), prices.length],
   ];
@@ -40,7 +51,7 @@ export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
   const shown = useMemo(() => (p && p.now !== null && p.series.length >= 2 ? { ...p, now: p.now } : null), [p]);
   const [picked, setPicked] = useState<number | null>(null);
   const point = shown && picked !== null ? shown.series[picked] : undefined;
-  const vol = point && shown?.volumes.find(([t]) => t === point[0]);
+  const volAt = useMemo(() => volumeLookup(shown), [shown]);
   const bottom = useBottomGap();
   return (
     <View testID="full-root" style={[styles.root, { paddingBottom: bottom }]}>
@@ -52,12 +63,12 @@ export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
             <Text style={styles.price}>{formatPrice(shown.now)}</Text>
             <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
           </View>
-          <Text style={[styles.small, styles.readout]}>{point ? readoutText(point[0], point[1], vol ? vol[1] : null) : ''}</Text>
+          <Text style={[styles.small, styles.readout]}>{point && picked !== null ? readoutText(point[0], point[1], volAt(picked)) : ''}</Text>
           <View style={[styles.chart, prices.stale && styles.stale]}>
-            <PriceChart data={shown} days={days} color={shown.change < 0 ? DOWN : UP} picked={point ? picked : null} onPick={setPicked} />
+            <PriceChart data={shown} color={shown.change < 0 ? DOWN : UP} picked={point ? picked : null} onPick={setPicked} />
           </View>
           <View style={styles.grid}>
-            {figures(shown, days).map(([k, v]) => (
+            {figures(shown).map(([k, v]) => (
               <View key={k} style={styles.cell}>
                 <Text style={styles.small}>{k}</Text>
                 <Text style={styles.value}>{v}</Text>

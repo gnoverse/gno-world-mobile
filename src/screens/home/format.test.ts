@@ -84,6 +84,10 @@ test('price scale: time across, price up; the nearest point to a finger, ends in
 test('round price ticks inside the range', () => {
   expect(niceTicks(0.0567, 0.0617, 5)).toEqual([0.057, 0.058, 0.059, 0.06, 0.061]);
   expect(niceTicks(0.0583, 0.0583, 5)).toEqual([0.0583]);
+  // the step whose count is nearest to 5: on the live 7d range, 6 labels rather than 3 every 0.002 …
+  expect(niceTicks(0.0564, 0.062, 5)).toEqual([0.057, 0.058, 0.059, 0.06, 0.061, 0.062]);
+  // … and 4 rather than 9 every 0.0002 on the 1d range
+  expect(niceTicks(0.058, 0.0596, 5)).toEqual([0.058, 0.0585, 0.059, 0.0595]);
 });
 
 test('time ticks: every 6 hours for a day, midnights for a week, weeks for a month', () => {

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
-import type { PriceDays, Prices } from '@/offchain/home';
+import type { Prices } from '@/offchain/home';
 import { colors } from '@/theme';
 
 import { formatPrice, niceTicks, priceScale, timeTicks } from '../format';
@@ -19,8 +19,8 @@ const axisLabel = (p: number) => formatPrice(p).slice(1);
  * The full-screen price chart: line and area, price axis right, time axis below, volume bars at the bottom. Hold and
  * slide to pick a point: `onPick` gets its index (null when the finger lifts), `picked` draws the crosshair on it.
  */
-export function PriceChart({ data, days, color, picked = null, onPick }: {
-  data: Prices; days: PriceDays; color: string; picked?: number | null; onPick?(i: number | null): void;
+export function PriceChart({ data, color, picked = null, onPick }: {
+  data: Prices; color: string; picked?: number | null; onPick?(i: number | null): void;
 }) {
   const [size, setSize] = useState({ width: 0, height: 0 });
   const drawn = useMemo(() => {
@@ -41,10 +41,11 @@ export function PriceChart({ data, days, color, picked = null, onPick }: {
           .join('')
       : '';
     const barW = Math.max(1, (right / Math.max(1, data.volumes.length)) * 0.7);
-    const prices = niceTicks(scale.min, scale.max, 8);
-    const times = timeTicks(data.series[0][0], data.series[data.series.length - 1][0], days);
+    const prices = niceTicks(scale.min, scale.max, 5);
+    // the period of the data drawn: while another period loads, these are still the old one's
+    const times = timeTicks(data.series[0][0], data.series[data.series.length - 1][0], data.days);
     return { scale, line, area, bars, barW, prices, times, right, bottom };
-  }, [size, data, days]);
+  }, [size, data]);
   const { responder } = useCrosshair({ onPick: (px) => onPick?.(px === null || !drawn ? null : drawn.scale.nearestIndex(px)) });
   const point = drawn && picked !== null ? data.series[picked] : undefined;
 

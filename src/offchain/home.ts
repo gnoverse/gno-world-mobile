@@ -9,6 +9,8 @@ export const PRICES_EVERY_MS = 300000;
 export const WHERE_EVERY_MS = 20000;
 
 export interface Prices {
+  /** the period this reply covers */
+  days: PriceDays;
   /** USD; null: the reply had no price (the site then says "no prices right now") */
   now: number | null;
   /** percent, the server's 24h figure whatever the period */
@@ -56,6 +58,7 @@ const points = (v: unknown): [number, number][] =>
 export async function fetchPrices(oc: Offchain, days: PriceDays): Promise<Prices> {
   const o = obj(await oc.get<unknown>(`/api/prices?coin=gnot&days=${days}`));
   return {
+    days,
     now: isNum(o.now) ? o.now : null,
     change: num(o.change),
     cap: num(o.cap),
