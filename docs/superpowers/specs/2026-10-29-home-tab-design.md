@@ -68,8 +68,8 @@ Maquette retenue le 2026-10-29 (option A, `.superpowers/brainstorm/…/home-layo
 l'ordre du site, la page défile.
 
 **Carte GNOT :** en-tête « GNOT » et un sélecteur 1d / 7d / 30d (1d par défaut) ; le prix en grand, la variation en
-vert (`colors.ring`) ou rouge (`colors.bad`) ; un graphique en ligne (`colors.accent`) ; la capitalisation en petit
-(« cap $11.5M »).
+vert (`colors.ring`) ou rouge (`colors.bad`) ; un graphique en ligne (`colors.accent`) ; la valorisation en petit comme le
+site : « fdv $77.7M », ou « mc $11.5M » sans fdv (changé le 2026-10-29, voir `2026-10-29-home-fullscreen-design.md` §9).
 
 **Carte Here now :** en-tête « Here now » et le total en mots (§3) ; puis le tableau du site, chaque ligne : drapeau,
 nom du pays, barre proportionnelle au plus grand, nombre. Toute la liste (la page défile).

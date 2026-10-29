@@ -10,7 +10,7 @@ import { CARD_HEIGHT } from '@/screens/home/layout';
 
 let mockChat: ReturnType<typeof createChatStore>;
 const serve = async (path: string): Promise<unknown> => {
-  if (path.startsWith('/api/prices')) return { now: 0.05822, change: -0.308, cap: 11487970.4, series: [[1, 0.0584], [2, 0.0583]] };
+  if (path.startsWith('/api/prices')) return { now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 77713900, series: [[1, 0.0584], [2, 0.0583]] };
   if (path === '/api/where') return { by_country: [{ cc: 'FR', n: 3 }], count: 18, elsewhere: 0, geo: true };
   throw new Error(`unexpected ${path}`);
 };
@@ -62,7 +62,7 @@ test('switching period keeps the price while the new chart loads', async () => {
   await fireEvent.press(screen.getByRole('button', { name: '30 days' }));
   expect(mockGet).toHaveBeenCalledWith('/api/prices?coin=gnot&days=30');
   expect(screen.getByText('$0.0582')).toBeTruthy();
-  expect(screen.getByText('cap $11.5M')).toBeTruthy();
+  expect(screen.getByText('fdv $77.7M')).toBeTruthy();
 });
 
 test('the three cards are the same height', async () => {

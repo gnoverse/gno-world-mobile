@@ -6,7 +6,7 @@ import { Card } from '@/components/card';
 import { PRICE_DAYS, type PriceDays, type Prices } from '@/offchain/home';
 import { colors, radius, space } from '@/theme';
 
-import { chartGeom, formatCap, formatChange, formatPrice } from './format';
+import { chartGeom, formatChange, formatFdv, formatPrice } from './format';
 import { CARD_HEIGHT } from './layout';
 
 const BUSY = 'prices are busy — trying again'; // the site's words
@@ -30,6 +30,7 @@ export function PriceCard({
   // as the site: no price, or fewer than 2 points, is no prices at all — never a $0
   const shown = data && data.now !== null && data.series.length >= 2 ? { ...data, now: data.now } : null;
   const geom = shown && plot.width && plot.height ? chartGeom(shown.series, plot.width, plot.height) : null;
+  const figure = shown && formatFdv(shown);
   return (
     <Card style={styles.card}>
       <View style={styles.head}>
@@ -68,7 +69,7 @@ export function PriceCard({
         </View>
         {geom && <Text style={styles.small}>{formatPrice(geom.min)}</Text>}
       </View>
-      {shown && shown.cap > 0 && <Text style={styles.small}>{formatCap(shown.cap)}</Text>}
+      {figure && <Text style={styles.small}>{figure}</Text>}
       {failed && <Text style={styles.small}>{BUSY}</Text>}
     </Card>
   );

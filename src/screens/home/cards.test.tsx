@@ -16,17 +16,17 @@ jest.mock('@/state/app-services', () => ({
   useChat: <T,>(sel: (s: ReturnType<typeof mockChat.getState>) => T) => mockUseStore(mockChat, sel),
 }));
 
-const PRICES: Prices = { now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 0, supply: 0, series: [[1793183280, 0.0584], [1793183340, 0.0583]], volumes: [] };
+const PRICES: Prices = { now: 0.05822, change: -0.308, cap: 11487970.4, fdv: 77713900, supply: 0, series: [[1793183280, 0.0584], [1793183340, 0.0583]], volumes: [] };
 const WHERE: Where = { count: 18, byCountry: [{ cc: 'FR', n: 3 }, { cc: 'AU', n: 1 }], elsewhere: 2, geo: true, spots: [] };
 
 const layout = (el: Parameters<typeof fireEvent>[0], width: number, height: number) =>
   fireEvent(el, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width, height } } });
 
 describe('PriceCard', () => {
-  test('shows the price, the change, the cap and the periods', async () => {
+  test('shows the price, the change, the fdv and the periods', async () => {
     const onDays = jest.fn();
     await render(<PriceCard data={PRICES} failed={false} days={1} onDays={onDays} />);
-    for (const t of ['GNOT', '$0.0582', '−0.31%', 'cap $11.5M']) expect(screen.getByText(t)).toBeTruthy();
+    for (const t of ['GNOT', '$0.0582', '−0.31%', 'fdv $77.7M']) expect(screen.getByText(t)).toBeTruthy();
     expect(screen.getByRole('button', { name: '1 day' }).props.accessibilityState).toMatchObject({ selected: true });
     expect(screen.getByRole('button', { name: '7 days' }).props.accessibilityState).toMatchObject({ selected: false });
     await fireEvent.press(screen.getByRole('button', { name: '7 days' }));
@@ -52,7 +52,7 @@ describe('PriceCard', () => {
 
   test('while another period loads, the price stays and the old chart dims', async () => {
     await render(<PriceCard data={PRICES} stale failed={false} days={30} onDays={jest.fn()} />);
-    for (const t of ['$0.0582', '−0.31%', 'cap $11.5M']) expect(screen.getByText(t)).toBeTruthy();
+    for (const t of ['$0.0582', '−0.31%', 'fdv $77.7M']) expect(screen.getByText(t)).toBeTruthy();
     expect(screen.getByTestId('price-chart-box').props.accessibilityState).toMatchObject({ busy: true });
     expect(screen.queryByText('loading…')).toBeNull();
   });
@@ -69,6 +69,11 @@ describe('PriceCard', () => {
     expect(screen.getByTestId('price-chart').props).toMatchObject({ width: 300, height: 97 });
   });
 
+  test('without fdv the card shows the market cap as mc, as the site', async () => {
+    await render(<PriceCard data={{ ...PRICES, fdv: 0 }} failed={false} days={1} onDays={jest.fn()} />);
+    expect(screen.getByText('mc $11.5M')).toBeTruthy();
+  });
+
   test('one point is no chart, and no prices as the site says it', async () => {
     await render(<PriceCard data={{ ...PRICES, series: [[1, 2]] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.queryByTestId('price-chart')).toBeNull();
@@ -79,7 +84,7 @@ describe('PriceCard', () => {
     await render(<PriceCard data={{ now: null, change: 0, cap: 0, fdv: 0, supply: 0, series: [], volumes: [] }} failed={false} days={1} onDays={jest.fn()} />);
     expect(screen.getByText('no prices right now')).toBeTruthy();
     expect(screen.queryByText(/^\$0/)).toBeNull();
-    expect(screen.queryByText(/^cap/)).toBeNull();
+    expect(screen.queryByText(/^(fdv|mc) /)).toBeNull();
   });
 });
 
