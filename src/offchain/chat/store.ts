@@ -6,6 +6,7 @@ import type { ChatClient } from './client';
 import type { ChatIdentity } from './identity';
 import { displayName } from './identity-store';
 import { applyOlder, applyPoll, EMPTY_VIEW, genChanged, patchLine, removeLine, upsertLine, type ChatView } from './merge';
+import type { RoomInvite } from './types';
 
 export interface KV {
   getItem(k: string): Promise<string | null>;
@@ -23,6 +24,10 @@ export interface ChatState extends ChatView {
   myVotes: Record<number, number>;
   /** the last refused action, in words for the composer */
   error: string;
+  /** the room's name as its poll gives it; '' for Public or until known */
+  roomName: string;
+  /** three polls in a row found no such room: it is gone and the loop stopped */
+  gone: boolean;
   start(): void;
   stop(): void;
   restart(): void;
@@ -35,6 +40,10 @@ export interface ChatState extends ChatView {
   /** tells the server this client is typing n characters (0 clears it) */
   signalTyping(n: number): void;
   markSeen(): void;
+  /** the room's maker pins or unpins a line */
+  pin(id: number, on: boolean): Promise<void>;
+  /** the room's maker removes a line */
+  deleteLine(id: number): Promise<void>;
   clearError(): void;
 }
 
@@ -49,10 +58,23 @@ export interface ChatDeps {
   now?: () => number;
   /** the server the chat talks to: each keeps its own last seen line */
   scope?: () => string;
+  /** the room this log is; '' (the default) is Public */
+  room?: string;
+  /** the Public poll's invitations to rooms */
+  onInvites?(dm: RoomInvite[]): void;
+  /** a line of this app's went out */
+  onPosted?(): void;
 }
 
 export const SEEN_KEY = 'br.chat.seen';
 export const MARKS_KEY = 'br.chat.marks';
+/** A room is gone after this many polls in a row answer 404, this far apart (the site's numbers). */
+const GONE_AFTER = 3;
+const GONE_RETRY = 20_000;
+
+/** Where a log's last seen line is kept: Public keeps the key it always had. */
+export const seenKeyFor = (scope: string | undefined, room = '') =>
+  `${scope === undefined ? SEEN_KEY : `${SEEN_KEY}:${scope}`}${room ? `:${room}` : ''}`;
 /** As the site's br.rx: the newest 400 lines' marks are kept. */
 const MARKS_MAX = 400;
 
@@ -90,8 +112,9 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
   let run: AbortController | null = null;
   let olderBusy = false;
   let seenLoaded: number | null = null; // the stored last seen id; null until read
-  const seenKey = () => (d.scope ? `${SEEN_KEY}:${d.scope()}` : SEEN_KEY);
-  const marksKey = () => (d.scope ? `${MARKS_KEY}:${d.scope()}` : MARKS_KEY);
+  const room = d.room ?? '';
+  const seenKey = () => seenKeyFor(d.scope?.(), room);
+  const marksKey = () => `${d.scope ? `${MARKS_KEY}:${d.scope()}` : MARKS_KEY}${room ? `:${room}` : ''}`;
   let typingAt = 0;
   let typingN = 0;
   // bumped when the view is replaced (restart, a new gen): an answer to a request made before is about another view
@@ -134,12 +157,14 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
       await ready;
       let first = !resume; // a resume long-polls from the cursor it holds; a new gen still reloads (below)
       let backoff = BACKOFF_MIN;
+      let misses = 0; // 404s in a row: a room quiet for a month is gone
       set({ phase: 'loading' });
       while (!signal.aborted) {
         const v = get();
+        const who = displayName(d.identity()).slice(0, 96);
         try {
           const r = await d.client.poll(
-            first ? { since: 0, wait: 0, limit: 80, gen: null, name: '' } : { since: v.since, wait: 55, limit: 200, gen: v.gen, name: '' },
+            first ? { since: 0, wait: 0, limit: 80, gen: null, name: who } : { since: v.since, wait: 55, limit: 200, gen: v.gen, name: who },
             { timeoutMs: first ? 20_000 : 70_000, signal },
           );
           if (signal.aborted) return;
@@ -151,15 +176,25 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
             seenLoaded = null;
             continue;
           }
-          set({ ...applyPoll(first ? EMPTY_VIEW : get(), r), phase: 'live' });
+          set({ ...applyPoll(first ? EMPTY_VIEW : get(), r), phase: 'live', ...(r.roomName ? { roomName: r.roomName } : {}) });
+          if (!room && r.dm.length) d.onInvites?.(r.dm);
           if (first) {
             await settleSeen();
             await loadMarks();
           }
           first = false;
           backoff = BACKOFF_MIN;
+          misses = 0;
         } catch (e) {
           if (signal.aborted) return;
+          if (room && e instanceof OffchainError && e.status === 404) {
+            if (++misses >= GONE_AFTER) {
+              set({ gone: true, phase: 'idle' });
+              return;
+            }
+            await sleep(GONE_RETRY, signal);
+            continue;
+          }
           if (e instanceof OffchainError && (e.status === 429 || e.status === 503)) {
             await sleep(((e.retryAfter ?? 6) + random() * 6) * 1000, signal);
             continue;
@@ -190,6 +225,8 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
       myReactions: {},
       myVotes: {},
       error: '',
+      roomName: '',
+      gone: false,
       start: () => {
         if (run) return;
         run = new AbortController();
@@ -230,7 +267,10 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
           const l = await d.client.post(name(), text, re);
           if (e === epoch) set((s) => ({ ...upsertLine(s, l), mine: [...s.mine, l.id] }));
         });
-        if (ok) typingAt = typingN = 0; // the server drops the sender's typing with the line
+        if (ok) {
+          typingAt = typingN = 0; // the server drops the sender's typing with the line
+          d.onPosted?.();
+        }
         return ok;
       },
       edit: (id, body) => {
@@ -293,6 +333,20 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
         seenLoaded = newest;
         set({ lastSeen: newest });
         void d.kv.setItem(seenKey(), seenValue(newest)).catch(() => undefined);
+      },
+      pin: async (id, on) => {
+        const e = epoch;
+        await act(async () => {
+          const r = await d.client.pin(id, on);
+          if (e === epoch) set((s) => ({ ...patchLine(s, id, { pinned: on }), pins: r.pins }));
+        });
+      },
+      deleteLine: async (id) => {
+        const e = epoch;
+        await act(async () => {
+          await d.client.deleteLine(id);
+          if (e === epoch) set((s) => removeLine(s, id));
+        });
       },
       clearError: () => set({ error: '' }),
     };

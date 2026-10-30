@@ -1,9 +1,9 @@
 import type { ChatClient, PollQuery } from '@/offchain/chat/client';
 import { NO_IDENTITY, type ChatIdentity } from '@/offchain/chat/identity';
 import { unreadCount } from '@/offchain/chat/merge';
-import { createChatStore, MARKS_KEY, SEEN_KEY } from '@/offchain/chat/store';
+import { createChatStore, MARKS_KEY, SEEN_KEY, seenKeyFor } from '@/offchain/chat/store';
 import { line, reply } from '@/offchain/chat/testing';
-import type { ChatPollReply } from '@/offchain/chat/types';
+import type { ChatPollReply, RoomInvite } from '@/offchain/chat/types';
 import { OffchainError } from '@/offchain/http';
 
 // real timers: lets the loop's awaits (identity, kv, poll) settle; the stubbed sleep never waits
@@ -14,7 +14,10 @@ const flush = async () => {
 /** Poll answers are queued; once the queue is empty a poll hangs until it is aborted. */
 function harness(
   answers: (ChatPollReply | Error)[],
-  opts: { identity?: ChatIdentity; seen?: string; kv?: Map<string, string>; scope?: string } = {},
+  opts: {
+    identity?: ChatIdentity; seen?: string; kv?: Map<string, string>; scope?: string; room?: string;
+    onInvites?: (dm: RoomInvite[]) => void; onPosted?: () => void;
+  } = {},
 ) {
   const queries: PollQuery[] = [];
   const sleeps: number[] = [];
@@ -41,6 +44,8 @@ function harness(
     releaseName: jest.fn(),
     uploadAvatar: jest.fn(),
     reportBoop: jest.fn(),
+    pin: jest.fn(),
+    deleteLine: jest.fn(),
   };
   const store = createChatStore({
     client: client as unknown as ChatClient,
@@ -50,6 +55,9 @@ function harness(
     random: () => 0.5,
     now: () => clock,
     scope: opts.scope === undefined ? undefined : () => opts.scope!,
+    room: opts.room,
+    onInvites: opts.onInvites,
+    onPosted: opts.onPosted,
   });
   return { store, client, queries, sleeps, kv, tick: (ms: number) => (clock += ms), setIdentity: (i: ChatIdentity) => (ident = i) };
 }
@@ -470,4 +478,108 @@ test('an edit that changes nothing sends nothing', async () => {
   expect(await h.store.getState().edit(5, '  same ')).toBe(true);
   expect(h.client.edit).not.toHaveBeenCalled();
   h.store.getState().stop();
+});
+
+const ROOM = 'AAAAAAAAAAAAAAAAAAAA';
+
+test('a room keeps its own seen mark and marks', async () => {
+  const kv = new Map<string, string>();
+  const h = harness([reply({ msgs: [line(1), line(2)], gen: 3 })], { kv, scope: 'S', room: ROOM });
+  h.store.getState().start();
+  await flush();
+  expect(kv.get(`${SEEN_KEY}:S:${ROOM}`)).toBe('3:2');
+  expect(seenKeyFor('S', ROOM)).toBe(`${SEEN_KEY}:S:${ROOM}`);
+  expect(seenKeyFor('S', '')).toBe(`${SEEN_KEY}:S`);
+  h.client.react.mockResolvedValueOnce({ rx: { '👍': 1 }, mine: true });
+  await h.store.getState().react(2, '👍');
+  expect(kv.has(`${MARKS_KEY}:S:${ROOM}`)).toBe(true);
+  expect(kv.has(`${SEEN_KEY}:S`)).toBe(false);
+  expect(kv.has(`${MARKS_KEY}:S`)).toBe(false);
+  h.store.getState().stop();
+});
+
+test('the poll sends the current display name', async () => {
+  const h = harness([reply({ next: 1 }), reply({ next: 2 })], { identity: { ...NO_IDENTITY, name: 'bob' } });
+  h.store.getState().start();
+  await flush();
+  expect(h.queries[0].name).toBe('bob');
+  h.setIdentity({ ...NO_IDENTITY, name: 'bob', reservedName: 'Bobby' });
+  h.store.getState().stop();
+  h.store.getState().start();
+  await flush();
+  expect(h.queries.at(-1)!.name).toBe('Bobby');
+  h.store.getState().stop();
+});
+
+test('the poll\'s room name is kept', async () => {
+  const h = harness([reply({ roomName: 'Dev chat' })], { room: ROOM });
+  h.store.getState().start();
+  await flush();
+  expect(h.store.getState().roomName).toBe('Dev chat');
+  h.store.getState().stop();
+});
+
+test('three 404 polls 20 s apart make the room gone and stop polling; a success in between resets the count', async () => {
+  const nf = () => new OffchainError(404, 'no such room');
+  const h = harness([nf(), nf(), reply({ next: 1 }), nf(), nf(), nf()], { room: ROOM });
+  h.store.getState().start();
+  await flush();
+  expect(h.store.getState().gone).toBe(true);
+  expect(h.store.getState().phase).toBe('idle');
+  expect(h.sleeps.filter((ms) => ms === 20_000)).toHaveLength(4);
+  expect(h.queries).toHaveLength(6);
+});
+
+test('Public is never gone: a 404 there is an unreachable server', async () => {
+  const h = harness([new OffchainError(404, 'x'), new OffchainError(404, 'x'), new OffchainError(404, 'x')]);
+  h.store.getState().start();
+  await flush();
+  expect(h.store.getState().gone).toBe(false);
+  h.store.getState().stop();
+});
+
+test('pin replaces the pins and patches the line; deleteLine removes it; refusals set error', async () => {
+  const h = harness([reply({ msgs: [line(1), line(2)] })], { room: ROOM });
+  h.store.getState().start();
+  await flush();
+  h.client.pin.mockResolvedValueOnce({ pins: [line(2, { pinned: true })] });
+  await h.store.getState().pin(2, true);
+  expect(h.client.pin).toHaveBeenCalledWith(2, true);
+  expect(h.store.getState().pins.map((l) => l.id)).toEqual([2]);
+  expect(h.store.getState().lines.find((l) => l.id === 2)?.pinned).toBe(true);
+  h.client.deleteLine.mockResolvedValueOnce(undefined);
+  await h.store.getState().deleteLine(1);
+  expect(h.store.getState().lines.map((l) => l.id)).toEqual([2]);
+  h.client.deleteLine.mockRejectedValueOnce(new OffchainError(403, 'only the room\'s maker can do that'));
+  await h.store.getState().deleteLine(2);
+  expect(h.store.getState().error).toBe('only the room\'s maker can do that');
+  h.store.getState().stop();
+});
+
+test('Public hands each poll\'s invitations to onInvites; a room does not', async () => {
+  const dm: RoomInvite[] = [{ room: ROOM, name: 'x', from: 'bob', at: 5 }];
+  const got: RoomInvite[][] = [];
+  const pub = harness([reply({ dm })], { onInvites: (d) => got.push(d) });
+  pub.store.getState().start();
+  await flush();
+  expect(got).toEqual([dm]);
+  pub.store.getState().stop();
+  const inRoom: RoomInvite[][] = [];
+  const r = harness([reply({ dm })], { room: ROOM, onInvites: (d) => inRoom.push(d) });
+  r.store.getState().start();
+  await flush();
+  expect(inRoom).toEqual([]);
+  r.store.getState().stop();
+});
+
+test('onPosted is called after a successful send only', async () => {
+  const onPosted = jest.fn();
+  const h = harness([], { room: ROOM, onPosted });
+  await h.store.ready;
+  h.client.post.mockRejectedValueOnce(new OffchainError(403, 'no'));
+  await h.store.getState().send('hi');
+  expect(onPosted).not.toHaveBeenCalled();
+  h.client.post.mockResolvedValueOnce(line(4));
+  await h.store.getState().send('hi');
+  expect(onPosted).toHaveBeenCalledTimes(1);
 });
