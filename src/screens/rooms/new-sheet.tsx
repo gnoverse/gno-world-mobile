@@ -40,8 +40,11 @@ export function NewRoomSheet() {
     setBusy(true);
     setError('');
     const r = await f();
-    setBusy(false);
-    if ('error' in r) return setError(r.error);
+    if ('error' in r) {
+      setBusy(false);
+      return setError(r.error);
+    }
+    // busy until the sheet goes: Make stays in reach above the share sheet, and a second press makes a second room
     if (!then) return openInChat(r.id);
     // over this sheet, before it closes: iOS drops a share sheet asked for while the sheet is going away
     chatChannel.getState().select(r.id);

@@ -44,6 +44,19 @@ test('Make makes the room, selects it in Chat and opens the share sheet', async 
   jest.mocked(router.back).mockReset();
 });
 
+// the share sheet covers only the bottom of the screen: Make stays in reach above it
+test('Make cannot be pressed again while the share sheet is up', async () => {
+  const share = jest.spyOn(Share, 'share').mockImplementation(() => new Promise(() => undefined));
+  let made = 0;
+  mockS.client.make = async () => (made++, { id: N, name: 'tea', key: 'k1' });
+  await render(<NewRoomSheet />);
+  await fireEvent.changeText(screen.getByPlaceholderText('a name for a new room'), 'tea');
+  await fireEvent.press(screen.getByRole('button', { name: 'Make' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Make' }));
+  expect(made).toBe(1);
+  share.mockRestore();
+});
+
 test('a refused Make shows the server\'s words', async () => {
   mockS.client.make = async () => {
     throw new OffchainError(429, 'slow down — one room a minute');

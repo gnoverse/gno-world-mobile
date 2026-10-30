@@ -1,7 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 
 import { ChannelTabs, type Channel } from '@/screens/channels/channel-tabs';
+import { space } from '@/theme';
 
 const channels: Channel[] = [
   { id: '', name: 'Public', unread: 2 },
@@ -65,4 +66,16 @@ test('the row keeps its height above a list that takes the rest', async () => {
   await render(<ChannelTabs channels={channels} current="" onSelect={() => undefined} />);
   const row = screen.getByTestId('channel-tabs');
   expect(StyleSheet.flatten(row.props.style)).toMatchObject({ flexGrow: 0, flexShrink: 0 });
+});
+
+// a cold start (or a link) picks a pill not yet measured: it comes into view once laid out
+test('the current pill scrolls into view when it is first laid out', async () => {
+  const scrollTo = jest.mocked(ScrollView.prototype.scrollTo);
+  scrollTo.mockClear();
+  await render(<ChannelTabs channels={channels} current="BBBBBBBBBBBBBBBBBBBB" onSelect={() => undefined} />);
+  const layout = (x: number) => ({ nativeEvent: { layout: { x, y: 0, width: 80, height: 26 } } });
+  await fireEvent(screen.getByRole('tab', { name: 'Dev chat, 3 unread' }), 'layout', layout(100));
+  expect(scrollTo).not.toHaveBeenCalled();
+  await fireEvent(screen.getByRole('tab', { name: 'remi\'s test room with a long name' }), 'layout', layout(300));
+  expect(scrollTo).toHaveBeenCalledWith(expect.objectContaining({ x: 300 - space.l }));
 });

@@ -23,10 +23,11 @@ export function ChannelTabs({ channels, current, onSelect, separatorAfter, onAdd
 }) {
   const scroll = useRef<ScrollViewInstance>(null);
   const xs = useRef<Record<string, number>>({});
+  const show = (x: number) => scroll.current?.scrollTo({ x: Math.max(0, x - space.l), animated: true });
   // the current pill stays in view when it changes from elsewhere (a link, Write in …)
   useEffect(() => {
     const x = xs.current[current];
-    if (x !== undefined) scroll.current?.scrollTo({ x: Math.max(0, x - space.l), animated: true });
+    if (x !== undefined) show(x);
   }, [current]);
   return (
     <ScrollView testID="channel-tabs" ref={scroll} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.bar}>
@@ -39,7 +40,12 @@ export function ChannelTabs({ channels, current, onSelect, separatorAfter, onAdd
               accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected: on }}
               onPress={() => onSelect(c.id)}
               onLongPress={() => (c.id ? onLongPress?.(c.id) : undefined)}
-              onLayout={(e) => (xs.current[c.id] = e.nativeEvent.layout.x)}
+              onLayout={(e) => {
+                const { x } = e.nativeEvent.layout;
+                // the first time it is measured (a cold start on a room far along the row)
+                if (on && xs.current[c.id] === undefined) show(x);
+                xs.current[c.id] = x;
+              }}
               style={[styles.pill, on && styles.on]}>
               <Text style={[styles.name, on && styles.onText]} numberOfLines={1}>{c.keyed ? `🔑 ${c.name}` : c.name}</Text>
               {c.unread ? <Text style={styles.badge}>{c.unread > 99 ? '99+' : c.unread}</Text> : null}
