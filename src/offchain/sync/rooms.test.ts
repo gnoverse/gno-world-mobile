@@ -111,3 +111,27 @@ test('forgetRoom takes the room out and writes when it was left', () => {
   expect(got.rooms.map((r) => r.id)).toEqual([id(2)]);
   expect(got.left[id(1)]).toBe(7000);
 });
+
+test('updates run one after the other: two changes at once both stay', async () => {
+  const s = stores();
+  const b = s.make();
+  await b.save(book([room(1)]));
+  // the rooms registry and a /pair pull, each reading then writing the book
+  await Promise.all([
+    b.update((x) => rememberRoom(x, { id: id(2), name: 'made here', key: 'k2' }, 5000)),
+    b.update((x) => mergeBook(x, { rooms: [room(3)] })),
+  ]);
+  expect((await b.load()).rooms.map((r) => r.id).sort()).toEqual([id(1), id(2), id(3)].sort());
+  expect((await b.load()).rooms.find((r) => r.id === id(2))?.key).toBe('k2');
+});
+
+test('an update is written to the server it started on', async () => {
+  const s = stores();
+  const b = s.make();
+  const done = b.update((x) => rememberRoom(x, { id: id(4), name: 'here', key: '' }, 1));
+  s.setScope('http://127.0.0.1:8787');
+  await done;
+  expect(await b.load()).toEqual(EMPTY_BOOK);
+  s.setScope('https://gno.world');
+  expect((await b.load()).rooms.map((r) => r.id)).toEqual([id(4)]);
+});

@@ -29,7 +29,7 @@ function chatClient(room: string, polls: Record<string, PollQuery[]>, answers: R
 
 function harness(o: { book?: Book; listed?: ListedRoom[] } = {}) {
   let held: Book = o.book ?? EMPTY_BOOK;
-  const book: BookStore = { load: async () => held, save: async (b) => void (held = b) };
+  const book: BookStore = { load: async () => held, save: async (b) => void (held = b), update: async (f) => (held = f(held)) };
   const kv = new Map<string, string>();
   const kvs = { getItem: async (k: string) => kv.get(k) ?? null, setItem: async (k: string, v: string) => void kv.set(k, v) };
   const polls: Record<string, PollQuery[]> = {};

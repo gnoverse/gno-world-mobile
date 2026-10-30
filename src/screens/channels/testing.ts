@@ -29,7 +29,7 @@ export function screenServices(o: { book?: Book; listed?: ListedRoom[] | null; c
     ...o.client,
   };
   const rooms = createRoomsStore({
-    client, book: { load: async () => held, save: async (b) => void (held = b) }, publicStore: chat, kv: kvs, scope,
+    client, book: { load: async () => held, save: async (b) => void (held = b), update: async (f) => (held = f(held)) }, publicStore: chat, kv: kvs, scope,
     syncChanged: () => undefined,
     makeRoomStore: (room, onPosted) => createChatStore({ client: chatClient, identity: () => NO_IDENTITY, kv: kvs, scope, room, onPosted }),
   });

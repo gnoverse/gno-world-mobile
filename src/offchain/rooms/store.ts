@@ -122,8 +122,6 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
   let lastPoke = -Infinity;
   // bumped by restart(): an answer to a request made before is about another server
   let epoch = 0;
-  // book writes one after the other: each reads what the previous one saved
-  let writing: Promise<unknown> = Promise.resolve();
 
   return createStore<RoomsState>()((set, get) => {
     const drop = (id: string) => {
@@ -135,19 +133,14 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
       if (get().focused === id) set({ focused: '' });
     };
 
-    /** read-modify-write of the book: a /pair pull that saved meanwhile is merged, not overwritten */
+    /** the book's own update: a /pair pull changing it meanwhile is merged, not overwritten */
     const changeBook = (f: (b: Book) => Book) => {
       const e = epoch;
-      const run = writing.then(async () => {
+      return d.book.update(f).then((b) => {
         if (e !== epoch) return;
-        const b = f(await d.book.load());
-        if (e !== epoch) return;
-        await d.book.save(b);
         set({ book: b });
         d.syncChanged();
       });
-      writing = run.catch(() => undefined);
-      return run;
     };
     const remember = (r: { id: string; name: string; key?: string }) => changeBook((b) => rememberRoom(b, r, now()));
     const forget = (id: string) => changeBook((b) => forgetRoom(b, id, now()));
@@ -386,7 +379,6 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
         seenInvites.clear();
         claims.clear();
         lastPoke = -Infinity;
-        writing = Promise.resolve();
         set({ ...INITIAL });
         if (wasActive) get().resume();
       },
