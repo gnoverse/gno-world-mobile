@@ -96,7 +96,9 @@ export function ChatScreen() {
         <Banner text={`"${goneSaid}" is gone — the room was quiet for a month`} onDismiss={() => rooms.getState().dismissGone()} />
       ) : null}
       {notice ? <Banner text={notice} onDismiss={() => setNotice('')} /> : null}
+      {/* one per channel: a reply, an edit or a draft names lines of that room only */}
       <ChatPane
+        key={current}
         store={store} identity={identity} offchainUrl={offchainUrl} onOpenIdentity={() => setSheet(true)} identityOpen={sheet}
         placeholder={`say something in ${name}`} canModerate={!!current && !!rooms.getState().keyOf(current)}
       />

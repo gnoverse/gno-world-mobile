@@ -171,3 +171,10 @@ test('the composer names the channel; the Chat tab pokes the scans and long-poll
   expect(poke).toHaveBeenCalled();
   expect(mockS.rooms.getState().focused).toBe(A);
 });
+
+test('a reply, an edit or a draft does not follow to another channel', async () => {
+  await render(<ChatScreen />);
+  await fireEvent.changeText(screen.getByPlaceholderText('say something in Public'), 'half a thought');
+  await fireEvent.press(screen.getByRole('tab', { name: 'Dev chat' }));
+  expect(screen.getByPlaceholderText('say something in Dev chat').props.value).toBe('');
+});

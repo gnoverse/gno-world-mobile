@@ -13,7 +13,9 @@ export function screenServices(o: { book?: Book; listed?: ListedRoom[] | null; c
   const kvs = { getItem: async (k: string) => kv.get(k) ?? null, setItem: async (k: string, v: string) => void kv.set(k, v) };
   let held = o.book ?? EMPTY_BOOK;
   const scope = () => 'http://fake';
-  const chat = createChatStore({ client: {} as never, identity: () => NO_IDENTITY, kv: kvs, scope });
+  // lines are set straight into the stores; typing is the one call a screen makes on its own
+  const chatClient = { typing: async () => undefined } as never;
+  const chat = createChatStore({ client: chatClient, identity: () => NO_IDENTITY, kv: kvs, scope });
   const client: RoomsClient = {
     make: async () => ({ id: '', name: '', key: '' }),
     info: async () => 'gone',
@@ -29,7 +31,7 @@ export function screenServices(o: { book?: Book; listed?: ListedRoom[] | null; c
   const rooms = createRoomsStore({
     client, book: { load: async () => held, save: async (b) => void (held = b) }, publicStore: chat, kv: kvs, scope,
     syncChanged: () => undefined,
-    makeRoomStore: (room, onPosted) => createChatStore({ client: {} as never, identity: () => NO_IDENTITY, kv: kvs, scope, room, onPosted }),
+    makeRoomStore: (room, onPosted) => createChatStore({ client: chatClient, identity: () => NO_IDENTITY, kv: kvs, scope, room, onPosted }),
   });
   rooms.setState({ book: held, listed: o.listed === undefined ? [] : o.listed });
   const homeChannels = createHomeChannels({ kv: kvs, scope });
