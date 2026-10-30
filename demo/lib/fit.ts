@@ -64,11 +64,7 @@ export function buildEdl(script: Script, timeline: Timeline, durations: Duration
         if (!(s.steps ?? []).some((st) => st.id === z && st.mark)) throw new Error(`scene ${s.id}: zoomOn ${z} is not a marked step`);
         const m = marks.get(`${s.id}.${z}`);
         // a step after the clip's end still gets its zoom, held for the end of the scene
-        if (!m?.box) continue;
-        // on the scene's first marked step: the scene opens on it, with no wide frame first (what is around it may be
-        // better left out, like live chat lines)
-        if (m === own[0]) zoom[0] = { f: 0, ...zoomFor(m.box, timeline.screen) };
-        else zoom.push({ f: Math.min(toFrame(m.t), Math.max(0, duration - ZOOM_HOLD)), ...zoomFor(m.box, timeline.screen) });
+        if (m?.box) zoom.push({ f: Math.min(toFrame(m.t), Math.max(0, duration - ZOOM_HOLD)), ...zoomFor(m.box, timeline.screen) });
       }
       zoom = zoom.sort((a, b) => a.f - b.f);
       // each zoom lets go after ZOOM_HOLD frames, unless the next zoom comes first: the camera never stays on a
