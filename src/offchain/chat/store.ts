@@ -139,7 +139,7 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
         const v = get();
         try {
           const r = await d.client.poll(
-            first ? { since: 0, wait: 0, limit: 80, gen: null } : { since: v.since, wait: 55, limit: 200, gen: v.gen },
+            first ? { since: 0, wait: 0, limit: 80, gen: null, name: '' } : { since: v.since, wait: 55, limit: 200, gen: v.gen, name: '' },
             { timeoutMs: first ? 20_000 : 70_000, signal },
           );
           if (signal.aborted) return;

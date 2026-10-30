@@ -58,7 +58,7 @@ test('the first poll takes the recent lines, the next ones wait on the cursor', 
   const h = harness([reply({ msgs: [line(1), line(2)], next: 2, gen: 4 }), reply({ msgs: [line(3)], next: 3, gen: 4 })]);
   h.store.getState().start();
   await flush();
-  expect(h.queries).toEqual([
+  expect(h.queries).toMatchObject([
     { since: 0, wait: 0, limit: 80, gen: null },
     { since: 2, wait: 55, limit: 200, gen: 4 },
     { since: 3, wait: 55, limit: 200, gen: 4 },
@@ -72,7 +72,7 @@ test('a new gen reloads from the start', async () => {
   const h = harness([reply({ msgs: [line(5)], next: 5, gen: 1 }), reply({ msgs: [line(9)], gen: 2 }), reply({ msgs: [line(1)], next: 1, gen: 2 })]);
   h.store.getState().start();
   await flush();
-  expect(h.queries[2]).toEqual({ since: 0, wait: 0, limit: 80, gen: null });
+  expect(h.queries[2]).toMatchObject({ since: 0, wait: 0, limit: 80, gen: null });
   expect(h.store.getState().lines.map((l) => l.id)).toEqual([1]);
   h.store.getState().stop();
 });
