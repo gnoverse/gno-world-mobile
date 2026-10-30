@@ -21,7 +21,7 @@ const nothing = () => {};
 
 /** The chat to read: Home's channels, live, with nothing to write, react or vote with. */
 export function ChatFull() {
-  const { homeChannels } = useServices();
+  const { homeChannels, chatChannel } = useServices();
   const { channels, current, name, store: chat, select } = useHomeTabs();
   const [picking, setPicking] = useState(false);
   const s = useStore(chat);
@@ -77,9 +77,13 @@ export function ChatFull() {
         onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: index * 80, animated: true })}
         renderItem={renderItem}
       />
-      {/* to the Chat tab, on the channel read here */}
+      {/* to the Chat tab, on the channel read here (Home's channels are all in Chat's row) */}
       <Pressable
-        accessibilityRole="button" onPress={() => router.dismissTo({ pathname: '/chat', params: current ? { room: current } : {} })}
+        accessibilityRole="button"
+        onPress={() => {
+          chatChannel.getState().select(current);
+          router.dismissTo('/chat');
+        }}
         style={[styles.foot, { paddingBottom: bottom }]}>
         <Text style={styles.write} numberOfLines={1}>Write in {name} ›</Text>
       </Pressable>

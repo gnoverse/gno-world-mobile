@@ -128,17 +128,20 @@ describe('Chat, read only', () => {
     }
   });
 
-  test('Write in Public › goes to the Chat tab on Public', async () => {
+  test('Write in Public › goes to the Chat tab on Public, whatever it showed', async () => {
+    mockS.chatChannel.getState().select(ROOM);
     await render(<ChatFull />);
     await fireEvent.press(screen.getByRole('button', { name: 'Write in Public ›' }));
-    expect(router.dismissTo).toHaveBeenCalledWith({ pathname: '/chat', params: {} });
+    expect(mockS.chatChannel.getState().current).toBe('');
+    expect(router.dismissTo).toHaveBeenCalledWith('/chat');
   });
 
   test('Write in Dev chat › goes to the Chat tab on that room', async () => {
     mockS.homeChannels.getState().add({ id: ROOM, name: 'Dev chat' });
     await render(<ChatFull />);
     await fireEvent.press(screen.getByRole('button', { name: 'Write in Dev chat ›' }));
-    expect(router.dismissTo).toHaveBeenCalledWith({ pathname: '/chat', params: { room: ROOM } });
+    expect(mockS.chatChannel.getState().current).toBe(ROOM);
+    expect(router.dismissTo).toHaveBeenCalledWith('/chat');
   });
 
   test('the full screen switches channel for Home too', async () => {
