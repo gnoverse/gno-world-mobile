@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Share } from 'react-native';
 import { useStore as mockUseStore } from 'zustand';
 
 import { screenServices } from '@/screens/channels/testing';
@@ -42,27 +42,49 @@ test('Public: Pair with a browser only', async () => {
   expect(labels()).toEqual(['Pair with a browser']);
 });
 
-test('Delete room asks with the site\'s words, then drops the room and goes back to Public', async () => {
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+// iOS drops an alert, a second modal or a share sheet asked for while a sheet is closing: everything happens in the
+// sheet that is open
+test('Delete room asks in the sheet, with the site\'s words, then drops the room and goes back to Public', async () => {
+  const alert = jest.spyOn(Alert, 'alert');
   const onLeft = jest.fn();
   await render(<RoomMenu id={M} visible onClose={noop} onLeft={onLeft} />);
   await fireEvent.press(screen.getByRole('button', { name: 'Delete room' }));
-  expect(alert.mock.calls[0][0]).toBe('Delete this room for everyone? It cannot be undone.');
-  await act(async () => alert.mock.calls[0][2]!.find((b) => b.text === 'Delete room')!.onPress!());
+  expect(screen.getByText('Delete this room for everyone? It cannot be undone.')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'Delete room' }));
+  await act(async () => undefined);
   expect(mockS.book().rooms.map((r) => r.id)).toEqual([A]);
   expect(onLeft).toHaveBeenCalled();
+  expect(alert).not.toHaveBeenCalled();
   alert.mockRestore();
 });
 
-test('Rename without the key says it is renamed for you', async () => {
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+test('Rename asks in the sheet and says there it is renamed for you', async () => {
+  const alert = jest.spyOn(Alert, 'alert');
   await render(<RoomMenu id={A} visible onClose={noop} onLeft={noop} />);
   await fireEvent.press(screen.getByRole('button', { name: 'Rename' }));
   await fireEvent.changeText(screen.getByPlaceholderText('a new name'), 'ours');
   await fireEvent.press(screen.getByRole('button', { name: 'Save' }));
-  expect(alert).toHaveBeenCalledWith('Rename', 'renamed to "ours" for you (the room\'s maker or the owner renames it for everyone)');
+  expect(await screen.findByText('renamed to "ours" for you (the room\'s maker or the owner renames it for everyone)')).toBeTruthy();
   expect(mockS.book().rooms.find((r) => r.id === A)?.name).toBe('ours');
+  expect(alert).not.toHaveBeenCalled();
   alert.mockRestore();
+});
+
+test('Invite… is a form in the sheet', async () => {
+  await render(<RoomMenu id={M} visible onClose={noop} onLeft={noop} />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Invite…' }));
+  expect(screen.getByPlaceholderText('their name')).toBeTruthy();
+});
+
+test('Share link shares over the sheet, then closes it', async () => {
+  const order: string[] = [];
+  const share = jest.spyOn(Share, 'share').mockImplementation(async () => (order.push('share'), { action: 'sharedAction', activityType: undefined }));
+  await render(<RoomMenu id={M} visible onClose={() => order.push('close')} onLeft={noop} />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Share link' }));
+  await act(async () => undefined);
+  expect(order).toEqual(['share', 'close']);
+  expect(share).toHaveBeenCalledWith({ message: `https://gno.world/#r/${M}` });
+  share.mockRestore();
 });
 
 test('Leave leaves and goes back to Public', async () => {

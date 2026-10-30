@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, KeyboardAvoidingView, StyleSheet, Text } from 'react-native';
+import { FlatList, KeyboardAvoidingView, StyleSheet, Text } from 'react-native';
 import { useStore, type StoreApi } from 'zustand';
 
 import { useNow } from '@/hooks/use-now';
@@ -135,11 +135,7 @@ export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, identit
         onReact={(l, e) => void store.getState().react(l.id, e)}
         onWithdraw={() => void store.getState().withdraw()}
         onPin={canModerate ? (l, on) => void store.getState().pin(l.id, on) : undefined}
-        onDelete={canModerate ? (l) =>
-          Alert.alert('Delete this line for everyone?', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Delete', style: 'destructive', onPress: () => void store.getState().deleteLine(l.id) },
-          ]) : undefined}
+        onDelete={canModerate ? (l) => void store.getState().deleteLine(l.id) : undefined}
       />
     </KeyboardAvoidingView>
   );

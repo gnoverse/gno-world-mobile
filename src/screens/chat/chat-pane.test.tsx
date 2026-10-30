@@ -204,7 +204,7 @@ test('with canModerate the line menu offers Pin and Delete; Delete asks first', 
   store.setState({ pin, deleteLine });
   store.getState().start();
   await waitFor(() => expect(store.getState().phase).toBe('unreachable'));
-  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  const alert = jest.spyOn(Alert, 'alert');
   await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" canModerate />);
   await fireEvent(screen.getByText('his line'), 'longPress');
   await fireEvent.press(screen.getByText('Pin'));
@@ -212,9 +212,11 @@ test('with canModerate the line menu offers Pin and Delete; Delete asks first', 
   await fireEvent(screen.getByText('his line'), 'longPress');
   await fireEvent.press(screen.getByText('Delete'));
   expect(deleteLine).not.toHaveBeenCalled();
-  expect(alert.mock.calls[0][0]).toBe('Delete this line for everyone?');
-  await act(async () => alert.mock.calls[0][2]!.find((b) => b.text === 'Delete')!.onPress!());
+  // asked in the menu itself: iOS drops an alert raised while the menu closes
+  expect(screen.getByText('Delete this line for everyone?')).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'Delete for everyone' }));
   expect(deleteLine).toHaveBeenCalledWith(2);
+  expect(alert).not.toHaveBeenCalled();
   alert.mockRestore();
   await act(() => store.getState().stop());
 });

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { roomLink } from '@/offchain/rooms/link';
@@ -8,20 +8,25 @@ import { useRooms, useServices } from '@/state/app-services';
 import { useSettings } from '@/state/settings';
 import { colors, radius, space } from '@/theme';
 
-import { InviteSheet } from './invite-sheet';
+import { InviteForm } from './invite-form';
 import { MenuSheet, type MenuItem } from './menu-sheet';
 
-/** The ⋯ of the Chat tab: the room's actions (the maker's need its key), and pairing. `id` '' is Public. */
+type Mode = 'menu' | 'rename' | 'invite' | 'delete' | 'said';
+
+/**
+ * The ⋯ of the Chat tab: the room's actions (the maker's need its key), and pairing. `id` '' is Public. What an action
+ * asks or answers shows in this same sheet (see MenuSheet).
+ */
 export function RoomMenu({ id, visible, onClose, onLeft }: { id: string; visible: boolean; onClose(): void; onLeft(): void }) {
   const { rooms } = useServices();
   const offchainUrl = useSettings((s) => s.offchainUrl);
-  const entry = useRooms((s) => s.book.rooms.find((r) => r.id === id));
+  const key = useRooms((s) => s.book.rooms.find((r) => r.id === id)?.key ?? '');
   const name = useRooms((s) => s.book.rooms.find((r) => r.id === id)?.name || s.listed?.find((r) => r.id === id)?.name || 'this room');
-  const key = entry?.key ?? '';
   const [listed, setListed] = useState<boolean | null>(null);
-  const [renaming, setRenaming] = useState(false);
+  const [mode, setMode] = useState<Mode>('menu');
   const [newName, setNewName] = useState('');
-  const [inviting, setInviting] = useState(false);
+  const [said, setSaid] = useState('');
+  const [busy, setBusy] = useState(false);
   // whether it is listed is the server's to say
   useEffect(() => {
     if (!visible || !key) return;
@@ -33,71 +38,84 @@ export function RoomMenu({ id, visible, onClose, onLeft }: { id: string; visible
       on = false;
     };
   }, [visible, key, id, rooms]);
-
-  const say = (title: string, words: string) => {
-    if (words) Alert.alert(title, words);
+  const close = () => {
+    setMode('menu');
+    onClose();
   };
+  const say = (words: string) => {
+    setSaid(words);
+    setMode('said');
+  };
+
   const items: MenuItem[] = [];
   if (id) {
-    items.push({ label: 'Share link', onPress: () => void Share.share({ message: roomLink(offchainUrl, id) }) });
-    if (key) items.push({ label: 'Invite…', onPress: () => setInviting(true) });
-    items.push({ label: 'Rename', onPress: () => (setNewName(name), setRenaming(true)) });
+    items.push({
+      label: 'Share link', stay: true,
+      // over this sheet, which closes after: iOS drops a share sheet asked for while a sheet closes
+      onPress: () => void Share.share({ message: roomLink(offchainUrl, id) }).catch(() => undefined).then(close),
+    });
+    if (key) items.push({ label: 'Invite…', stay: true, onPress: () => setMode('invite') });
+    items.push({ label: 'Rename', stay: true, onPress: () => (setNewName(name), setMode('rename')) });
     if (key) {
       items.push({
-        label: 'Listed publicly', detail: listed === null ? undefined : listed ? 'on' : 'off',
+        label: 'Listed publicly', detail: listed === null ? undefined : listed ? 'on' : 'off', stay: true,
         onPress: () =>
-          void rooms.getState().setListed(id, !listed).then((err) => (err ? say('Listed publicly', err) : setListed(!listed))),
+          void rooms.getState().setListed(id, !listed).then((err) => (err ? say(err) : setListed(!listed))),
       });
-      items.push({
-        label: 'Delete room', danger: true,
-        onPress: () =>
-          Alert.alert('Delete this room for everyone? It cannot be undone.', undefined, [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Delete room', style: 'destructive',
-              onPress: async () => {
-                const err = await rooms.getState().drop(id);
-                if (err) say('Delete room', err);
-                else onLeft();
-              },
-            },
-          ]),
-      });
+      items.push({ label: 'Delete room', danger: true, stay: true, onPress: () => setMode('delete') });
     }
     items.push({ label: 'Leave', onPress: () => void rooms.getState().leave(id).then(onLeft) });
   }
   items.push({ label: 'Pair with a browser', onPress: () => router.push('/pair') });
 
   return (
-    <>
-      <MenuSheet title={id ? name : undefined} items={items} visible={visible} onClose={onClose} />
-      <Modal visible={renaming} transparent animationType="fade" onRequestClose={() => setRenaming(false)}>
-        <View style={styles.center}>
-          <View style={styles.box}>
-            <Text style={styles.title}>Rename</Text>
-            <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="a new name" placeholderTextColor={colors.muted} />
-            <Button
-              title="Save" disabled={!newName.trim()}
-              onPress={async () => {
-                setRenaming(false);
-                say('Rename', await rooms.getState().rename(id, newName.trim()));
-              }}
-            />
-            <Pressable accessibilityRole="button" onPress={() => setRenaming(false)}>
-              <Text style={styles.cancel}>Cancel</Text>
-            </Pressable>
-          </View>
+    <MenuSheet title={id ? name : undefined} items={items} visible={visible} onClose={close}>
+      {mode === 'rename' ? (
+        <View style={styles.form}>
+          <TextInput style={styles.input} value={newName} onChangeText={setNewName} placeholder="a new name" placeholderTextColor={colors.muted} />
+          <Button
+            title="Save" disabled={busy || !newName.trim()}
+            onPress={async () => {
+              setBusy(true);
+              say(await rooms.getState().rename(id, newName.trim()));
+              setBusy(false);
+            }}
+          />
+          <Button title="Cancel" kind="secondary" onPress={() => setMode('menu')} />
         </View>
-      </Modal>
-      {key ? <InviteSheet id={id} visible={inviting} onClose={() => setInviting(false)} /> : null}
-    </>
+      ) : mode === 'invite' ? (
+        <View style={styles.form}>
+          <InviteForm id={id} />
+          <Button title="Done" kind="secondary" onPress={close} />
+        </View>
+      ) : mode === 'delete' ? (
+        <View style={styles.form}>
+          <Text style={styles.text}>Delete this room for everyone? It cannot be undone.</Text>
+          <Button
+            title="Delete room" kind="danger" disabled={busy}
+            onPress={async () => {
+              setBusy(true);
+              const err = await rooms.getState().drop(id);
+              setBusy(false);
+              if (err) return say(err);
+              close();
+              onLeft();
+            }}
+          />
+          <Button title="Cancel" kind="secondary" onPress={() => setMode('menu')} />
+        </View>
+      ) : mode === 'said' ? (
+        <View style={styles.form}>
+          <Text style={styles.text}>{said}</Text>
+          <Button title="OK" kind="secondary" onPress={close} />
+        </View>
+      ) : undefined}
+    </MenuSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, backgroundColor: '#000a', justifyContent: 'center', padding: space.xl },
-  box: { backgroundColor: colors.card, borderRadius: radius.m, padding: space.l, gap: space.m },
-  title: { color: colors.fg, fontSize: 16, fontWeight: '700' },
+  form: { gap: space.m },
   input: { color: colors.fg, borderColor: colors.line, borderWidth: 1, borderRadius: radius.s, padding: space.m },
-  cancel: { color: colors.muted, textAlign: 'center' },
+  text: { color: colors.fg },
 });

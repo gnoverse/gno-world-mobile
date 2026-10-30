@@ -1,28 +1,37 @@
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { Modal, Pressable, StyleSheet, Text } from 'react-native';
 
 import { colors, radius, space } from '@/theme';
 
-export interface MenuItem { label: string; onPress(): void; danger?: boolean; detail?: string }
+/** `stay`: the action closes the sheet itself, or shows something else in it */
+export interface MenuItem { label: string; onPress(): void; danger?: boolean; detail?: string; stay?: boolean }
 
-/** A bottom sheet of actions, closed by a tap outside it or after an action. */
-export function MenuSheet({ title, items, visible, onClose }: { title?: string; items: MenuItem[]; visible: boolean; onClose(): void }) {
+/**
+ * A bottom sheet of actions, closed by a tap outside it or after an action. `children`, when given, show instead of
+ * the items: what an action asks or says stays in this sheet, since iOS drops an alert, a second modal or a share
+ * sheet asked for while a sheet is closing.
+ */
+export function MenuSheet({ title, items, visible, onClose, children }: {
+  title?: string; items: MenuItem[]; visible: boolean; onClose(): void; children?: ReactNode;
+}) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessible={false}>
-        <View style={styles.sheet}>
+        {/* a tap inside the sheet stays there */}
+        <Pressable style={styles.sheet} accessible={false}>
           {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
-          {items.map((it) => (
+          {children ?? items.map((it) => (
             <Pressable
               key={it.label} accessibilityRole="button" accessibilityLabel={it.label} style={styles.item}
               onPress={() => {
-                onClose();
+                if (!it.stay) onClose();
                 it.onPress();
               }}>
               <Text style={[styles.label, it.danger && { color: colors.bad }]}>{it.label}</Text>
               {it.detail ? <Text style={styles.detail}>{it.detail}</Text> : null}
             </Pressable>
           ))}
-        </View>
+        </Pressable>
       </Pressable>
     </Modal>
   );
