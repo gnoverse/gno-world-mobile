@@ -8,7 +8,7 @@ import { ChatPane } from './chat-pane';
 import { IdentitySheet } from './identity-sheet';
 
 export function ChatScreen() {
-  const { chat } = useServices();
+  const { chat, identity } = useServices();
   const offchainUrl = useSettings((s) => s.offchainUrl);
   const active = useSession((s) => s.active);
   // `identity=1`: back from the wallet with a proof, its outcome is on the sheet
@@ -26,8 +26,8 @@ export function ChatScreen() {
   }, [askIdentity]);
   return (
     <>
-      <ChatPane store={chat} offchainUrl={offchainUrl} onOpenIdentity={() => setSheet(true)} onOpenPair={() => router.push('/pair')} identityOpen={sheet} />
-      <IdentitySheet store={chat} visible={sheet} onClose={() => setSheet(false)} offchainUrl={offchainUrl} identity={active?.master ?? ''} />
+      <ChatPane store={chat} identity={identity} offchainUrl={offchainUrl} onOpenIdentity={() => setSheet(true)} onOpenPair={() => router.push('/pair')} identityOpen={sheet} />
+      <IdentitySheet store={identity} visible={sheet} onClose={() => setSheet(false)} offchainUrl={offchainUrl} identity={active?.master ?? ''} />
     </>
   );
 }

@@ -1,11 +1,10 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
 import { OffchainError } from '@/offchain/http';
-import { buildChallengeLink, CALLBACK_URL, type WalletReply } from '@/session/gnoconnect';
 
 import type { ChatClient } from './client';
-import { NO_IDENTITY, type ChatIdentity, type IdentityStore } from './identity';
-import { proofFromReply } from './name-proof';
+import type { ChatIdentity } from './identity';
+import { displayName } from './identity-store';
 import { applyOlder, applyPoll, EMPTY_VIEW, genChanged, patchLine, removeLine, upsertLine, type ChatView } from './merge';
 
 export interface KV {
@@ -22,15 +21,8 @@ export interface ChatState extends ChatView {
   mine: number[];
   myReactions: Record<number, string[]>;
   myVotes: Record<number, number>;
-  identity: ChatIdentity;
-  /** the last refused action, in words for the composer or the sheet */
+  /** the last refused action, in words for the composer */
   error: string;
-  /** the last refused name or picture action, for the sheet */
-  identityError: string;
-  /** the server wants the wallet's signature and this build has no wallet to ask */
-  walletSoon: boolean;
-  /** a reservation waiting for the wallet's proof */
-  proving: { state: string; name: string; identity: string; chainId: string } | null;
   start(): void;
   stop(): void;
   restart(): void;
@@ -43,24 +35,13 @@ export interface ChatState extends ChatView {
   /** tells the server this client is typing n characters (0 clears it) */
   signalTyping(n: number): void;
   markSeen(): void;
-  setName(name: string): Promise<void>;
-  /** reserves the field's name for the identity (the session's master); false also while the wallet signs */
-  reserveName(identity: string): Promise<boolean>;
-  /** the wallet's answer to the chat's challenge: false when the reply is not the chat's */
-  onProofReply(r: WalletReply): Promise<boolean>;
-  /** stops waiting for the wallet (the sheet's Cancel) */
-  cancelProving(): void;
-  releaseName(): Promise<boolean>;
-  setAvatar(body: Blob | Uint8Array, contentType: string): Promise<boolean>;
   clearError(): void;
-  clearIdentityError(): void;
-  /** reads the identity store again: a name that came in by /pair */
-  reloadIdentity(): Promise<void>;
 }
 
 export interface ChatDeps {
   client: ChatClient;
-  identity: IdentityStore;
+  /** the identity lines go out under, read when writing (the identity store's) */
+  identity: () => ChatIdentity;
   kv: KV;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   random?: () => number;
@@ -68,14 +49,10 @@ export interface ChatDeps {
   now?: () => number;
   /** the server the chat talks to: each keeps its own last seen line */
   scope?: () => string;
-  /** the wallet, for a name the server wants proven: opens a GnoConnect link */
-  wallet?: { open(url: string): Promise<void>; randomHex(n: number): string; network(): { chainId: string; remote: string } };
 }
 
 export const SEEN_KEY = 'br.chat.seen';
 export const MARKS_KEY = 'br.chat.marks';
-/** The proof the chat waits for: kept, since the OS may evict the app during the minutes at the computer. */
-export const PROVING_KEY = 'br.chat.proving';
 /** As the site's br.rx: the newest 400 lines' marks are kept. */
 const MARKS_MAX = 400;
 
@@ -100,29 +77,6 @@ const say = (e: unknown) =>
     ? e.status !== 0 ? e.message : 'The chat server did not answer — try again.'
     : e instanceof Error ? e.message : 'The chat server did not answer — try again.';
 
-/** The wallet's refusal of a challenge, in words for the sheet. */
-const walletRefusal = (code: string) =>
-  code === 'signer_unavailable'
-    // the wallet answers it when its computer failed and when it does not hold the pinned identity
-    ? 'The wallet could not sign as this identity: its computer could not sign (run gnokey-pair with a gnokey that has sign-data), or the wallet does not hold this identity.'
-    : code === 'network_declined'
-      ? 'The wallet is on another network than the app.'
-      : `The wallet refused (${code || 'no reason given'}).`;
-
-/** The stored proof being waited for; null for anything else (none, or unreadable). */
-const parseProving = (raw: string | null): ChatState['proving'] => {
-  try {
-    const p: unknown = raw ? JSON.parse(raw) : null;
-    if (!p || typeof p !== 'object') return null;
-    const { state, name, identity, chainId } = p as Record<string, unknown>;
-    return [state, name, identity, chainId].every((v) => typeof v === 'string' && v)
-      ? { state, name, identity, chainId } as NonNullable<ChatState['proving']>
-      : null;
-  } catch {
-    return null;
-  }
-};
-
 /** The stored seen mark: "<gen>:<id>"; a plain number (older builds) has no gen. */
 const parseSeen = (raw: string | null): { gen: number | null; id: number } => {
   const m = raw ? /^(\d+):(\d+)$/.exec(raw) : null;
@@ -137,7 +91,6 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
   let olderBusy = false;
   let seenLoaded: number | null = null; // the stored last seen id; null until read
   const seenKey = () => (d.scope ? `${SEEN_KEY}:${d.scope()}` : SEEN_KEY);
-  const provingKey = () => (d.scope ? `${PROVING_KEY}:${d.scope()}` : PROVING_KEY);
   const marksKey = () => (d.scope ? `${MARKS_KEY}:${d.scope()}` : MARKS_KEY);
   let typingAt = 0;
   let typingN = 0;
@@ -145,7 +98,7 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
   let epoch = 0;
 
   const store = createStore<ChatState>()((set, get) => {
-    const name = () => get().identity.reservedName || get().identity.name || 'anon';
+    const name = () => displayName(d.identity());
 
     const seenValue = (id: number) => (get().gen === null ? String(id) : `${get().gen}:${id}`);
 
@@ -218,20 +171,15 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
       }
     };
 
-    const act = async (f: () => Promise<void>, field: 'error' | 'identityError' = 'error'): Promise<boolean> => {
+    const act = async (f: () => Promise<void>): Promise<boolean> => {
       try {
         await f();
-        set({ [field]: '' } as Partial<ChatState>);
+        set({ error: '' });
         return true;
       } catch (e) {
-        set({ [field]: say(e) } as Partial<ChatState>);
+        set({ error: say(e) });
         return false;
       }
-    };
-
-    const setProving = (proving: ChatState['proving']) => {
-      set({ proving });
-      void d.kv.setItem(provingKey(), proving ? JSON.stringify(proving) : '').catch(() => undefined);
     };
 
     return {
@@ -241,11 +189,7 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
       mine: [],
       myReactions: {},
       myVotes: {},
-      identity: NO_IDENTITY,
       error: '',
-      identityError: '',
-      walletSoon: false,
-      proving: null,
       start: () => {
         if (run) return;
         run = new AbortController();
@@ -262,11 +206,6 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
         seenLoaded = null; // another server, or the same one anew: read its mark again
         epoch++;
         set({ ...EMPTY_VIEW, mine: [], myReactions: {}, myVotes: {} });
-        // the reserved name and the avatar are per server: read what this one issued
-        const e = epoch;
-        void d.identity.load().then((identity) => {
-          if (e === epoch) set({ identity });
-        }, () => undefined);
         get().start();
       },
       loadOlder: async () => {
@@ -355,97 +294,11 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
         set({ lastSeen: newest });
         void d.kv.setItem(seenKey(), seenValue(newest)).catch(() => undefined);
       },
-      setName: async (n) => {
-        if (get().identity.reservedName) return; // a reserved name is released first
-        set({ identity: await d.identity.save({ name: n.trim() }) });
-      },
-      reserveName: async (identity) => {
-        const n = get().identity.name.trim();
-        set({ walletSoon: false });
-        try {
-          const r = await d.client.reserveName(n, identity);
-          set({ identity: await d.identity.save({ name: r.name, reservedName: r.name, nameKey: r.key }), identityError: '' });
-          setProving(null);
-          return true;
-        } catch (e) {
-          // as the site: a 409 asks for the wallet's signature, whatever it says
-          if (!(e instanceof OffchainError && e.status === 409)) {
-            set({ identityError: say(e) });
-            return false;
-          }
-          if (!d.wallet) {
-            set({ walletSoon: true, identityError: '' });
-            return false;
-          }
-        }
-        const wallet = d.wallet;
-        const launched = await act(async () => {
-          const challenge = await d.client.nameChallenge();
-          const state = wallet.randomHex(16);
-          const { chainId, remote } = wallet.network();
-          setProving({ state, name: n, identity, chainId });
-          await wallet.open(buildChallengeLink({ challenge, signer: identity, chainid: chainId, rpc: remote, callback: CALLBACK_URL, state }));
-        }, 'identityError');
-        if (!launched) setProving(null); // no wallet opened: nothing to wait for
-        return false;
-      },
-      onProofReply: async (r) => {
-        await ready; // a relaunched app reads what it waits for first
-        const p = get().proving;
-        if (!p || r.state !== p.state) return false;
-        setProving(null);
-        if (r.status === 'cancelled') return true;
-        if (r.status === 'error') {
-          set({ identityError: walletRefusal(r.code) });
-          return true;
-        }
-        await act(async () => {
-          const got = await d.client.proveName(p.name, proofFromReply(r, p.identity, p.chainId));
-          set({ identity: await d.identity.save({ name: got.name, reservedName: got.name, nameKey: got.key }) });
-        }, 'identityError');
-        return true;
-      },
-      cancelProving: () => setProving(null),
-      releaseName: () =>
-        act(async () => {
-          try {
-            await d.client.releaseName();
-          } catch (e) {
-            if (!(e instanceof OffchainError && e.status === 404)) throw e; // the server no longer has it: nothing to release
-          }
-          set({ identity: await d.identity.save({ reservedName: '', nameKey: '' }) });
-        }, 'identityError'),
-      setAvatar: (body, contentType) =>
-        act(async () => {
-          const r = await d.client.uploadAvatar(body, contentType);
-          set({ identity: await d.identity.save({ av: r.id, avkey: r.key }) });
-        }, 'identityError'),
       clearError: () => set({ error: '' }),
-      clearIdentityError: () => set({ identityError: '', walletSoon: false }),
-      reloadIdentity: async () => {
-        const e = epoch;
-        try {
-          const identity = await d.identity.load();
-          if (e === epoch) set({ identity });
-        } catch {
-          // an unreadable store keeps what the chat shows
-        }
-      },
     };
   });
 
-  const ready = Promise.all([
-    d.identity.load().then(
-      (identity) => store.setState({ identity }),
-      () => undefined,
-    ),
-    d.kv.getItem(provingKey()).then(
-      (raw) => {
-        const proving = parseProving(raw);
-        if (proving && !store.getState().proving) store.setState({ proving });
-      },
-      () => undefined,
-    ),
-  ]).then(() => undefined);
+  // kept for callers that wait for the store: nothing is read at creation any more
+  const ready = Promise.resolve();
   return Object.assign(store, { ready });
 }

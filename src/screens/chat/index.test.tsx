@@ -2,11 +2,13 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 
 import { NO_IDENTITY } from '@/offchain/chat/identity';
+import { createIdentityState } from '@/offchain/chat/identity-store';
 import { createChatStore } from '@/offchain/chat/store';
 import { ChatScreen } from '@/screens/chat';
 
 const mockParams: { identity?: string } = {};
 let mockChat: ReturnType<typeof createChatStore>;
+let mockIdentity: ReturnType<typeof createIdentityState>;
 
 jest.mock('expo-router', () => ({
   useFocusEffect: () => undefined,
@@ -15,17 +17,22 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('@/state/app-services', () => ({
-  useServices: () => ({ chat: mockChat }),
+  useServices: () => ({ chat: mockChat, identity: mockIdentity }),
   useSession: <T,>(sel: (s: { active: null }) => T) => sel({ active: null }),
 }));
 
 beforeEach(async () => {
   mockChat = createChatStore({
     client: {} as never,
+    identity: () => NO_IDENTITY,
+    kv: { getItem: async () => null, setItem: async () => undefined },
+  });
+  mockIdentity = createIdentityState({
+    client: {} as never,
     identity: { load: async () => NO_IDENTITY, save: async () => NO_IDENTITY },
     kv: { getItem: async () => null, setItem: async () => undefined },
   });
-  await mockChat.ready;
+  await Promise.all([mockChat.ready, mockIdentity.ready]);
 });
 
 // Back from the wallet, the answer to a proof (a name reserved, or refused) is

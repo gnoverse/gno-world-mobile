@@ -30,7 +30,7 @@ beforeEach(async () => {
   mockGet.mockClear().mockImplementation(serve);
   mockChat = createChatStore({
     client: {} as never,
-    identity: { load: async () => NO_IDENTITY, save: async () => NO_IDENTITY },
+    identity: () => NO_IDENTITY,
     kv: { getItem: async () => null, setItem: async () => undefined },
   });
   await mockChat.ready;

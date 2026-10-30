@@ -6,6 +6,7 @@ import { useStore, type StoreApi } from 'zustand';
 
 import { useNow } from '@/hooks/use-now';
 import { isMine } from '@/offchain/chat/merge';
+import type { IdentityState } from '@/offchain/chat/identity-store';
 import type { ChatState } from '@/offchain/chat/store';
 import type { ChatLine } from '@/offchain/chat/types';
 import { colors, space } from '@/theme';
@@ -18,12 +19,13 @@ import { Pins } from './pins';
 
 const NO_REACTIONS: string[] = [];
 
-export function ChatPane({ store, offchainUrl, onOpenIdentity, onOpenPair, identityOpen }: {
-  store: StoreApi<ChatState>; offchainUrl: string; onOpenIdentity?: () => void; onOpenPair?: () => void;
+export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, onOpenPair, identityOpen }: {
+  store: StoreApi<ChatState>; identity: StoreApi<IdentityState>; offchainUrl: string; onOpenIdentity?: () => void; onOpenPair?: () => void;
   /** the name sheet is showing */
   identityOpen?: boolean;
 }) {
   const s = useStore(store);
+  const me = useStore(identity, (i) => i.identity);
   const insets = useSafeAreaInsets();
   const now = useNow(15000);
   const list = useRef<FlatList<ChatLine>>(null);
@@ -61,7 +63,7 @@ export function ChatPane({ store, offchainUrl, onOpenIdentity, onOpenPair, ident
       onLongPress={openMenu} onJump={jumpTo} onReact={react} onVote={vote}
     />
   ), [mine, now, offchainUrl, s.myReactions, s.myVotes, openMenu, jumpTo, react, vote]);
-  const myName = s.identity.reservedName || s.identity.name;
+  const myName = me.reservedName || me.name;
   // the held-back line goes out when the sheet closes with a name (not as soon as one is saved: "Reserve" saves the
   // name, then reserves it — the line must carry the key); closing it without a name drops the line
   useEffect(() => {
@@ -81,7 +83,7 @@ export function ChatPane({ store, offchainUrl, onOpenIdentity, onOpenPair, ident
             <Text style={styles.youText}>pair</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={onOpenIdentity} style={styles.you}>
-            <Text style={styles.youText} numberOfLines={1}>{myName || 'you'}{s.identity.reservedName ? ' ✓' : ''}</Text>
+            <Text style={styles.youText} numberOfLines={1}>{myName || 'you'}{me.reservedName ? ' ✓' : ''}</Text>
           </Pressable>
         </View>
       </View>
