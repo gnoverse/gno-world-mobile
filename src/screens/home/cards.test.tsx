@@ -259,10 +259,12 @@ describe('ChatCard', () => {
     expect(mockS.homeChannels.getState().current).toBe('');
   });
 
-  test('a tab whose room is gone goes', async () => {
+  test('a tab whose room is gone goes; one scan\'s 404 alone does not', async () => {
     mockS.homeChannels.getState().add({ id: ROOM, name: 'Dev chat' });
     await render(<ChatCard />);
     await act(() => mockS.rooms.setState({ gone: { [ROOM]: true } }));
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    await act(() => mockS.rooms.getState().room(ROOM).setState({ gone: true }));
     expect(screen.getAllByRole('tab')).toHaveLength(1);
   });
 });

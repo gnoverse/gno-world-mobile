@@ -23,7 +23,6 @@ export function ChatScreen() {
   const current = useChatChannel((s) => s.current);
   const book = useRooms((s) => s.book);
   const listed = useRooms((s) => s.listed);
-  const gone = useRooms((s) => s.gone);
   const banner = useRooms((s) => s.banner);
   const goneSaid = useRooms((s) => s.goneSaid);
   // the row reads the scans' counts: recomputed whenever the registry changes
@@ -65,10 +64,11 @@ export function ChatScreen() {
     });
   }, [askRoom, rooms, chatChannel]);
 
-  // a channel left, gone, or no longer listed: back to Public (once the listing says so, not while it loads)
+  // a channel left, gone (its store forgets it), or no longer listed: back to Public (once the listing says so, not
+  // while it loads)
   useEffect(() => {
-    if (current && (gone[current] || (listed !== null && !channel))) chatChannel.getState().select('');
-  }, [current, gone, listed, channel, chatChannel]);
+    if (current && listed !== null && !channel) chatChannel.getState().select('');
+  }, [current, listed, channel, chatChannel]);
 
   useFocusEffect(
     useCallback(() => {

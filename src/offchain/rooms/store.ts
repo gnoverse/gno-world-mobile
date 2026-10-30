@@ -36,7 +36,8 @@ export interface RoomsState {
   banner: { id: string; name: string; from: string } | null;
   /** a room found gone by its own poll: its name, to say so once */
   goneSaid: string | null;
-  /** rooms a scan found gone (nothing is forgotten for it) */
+  /** rooms the last scan found gone: nothing is forgotten or hidden for it (one 404 may be a hiccup; the room's own
+   * poll decides, after three) */
   gone: Record<string, true>;
   /** the room long-polling beside Public; '' none */
   focused: string;
@@ -331,11 +332,17 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
               // never read here: what is there now is not unread
               const next = Math.max(r.next ?? 0, ...r.msgs.map((l) => l.id));
               if (next) void d.kv.setItem(key, r.gen === null ? String(next) : `${r.gen}:${next}`).catch(() => undefined);
-              set((st) => ({ unread: { ...st.unread, [id]: 0 } }));
+              set((st) => {
+                const { [id]: _g, ...gone } = st.gone;
+                return { unread: { ...st.unread, [id]: 0 }, gone };
+              });
               continue;
             }
             const n = r.msgs.filter((l) => l.id > mark && !isMine(l, r.you, s?.mine ?? [])).length;
-            set((st) => ({ unread: { ...st.unread, [id]: n } }));
+            set((st) => {
+              const { [id]: _g, ...gone } = st.gone; // reached again: an earlier 404 was a hiccup
+              return { unread: { ...st.unread, [id]: n }, gone };
+            });
           } catch (err) {
             if (e !== epoch) return;
             if (err instanceof OffchainError && err.status === 404) set((st) => ({ gone: { ...st.gone, [id]: true } }));

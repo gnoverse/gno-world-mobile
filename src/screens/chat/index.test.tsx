@@ -178,3 +178,10 @@ test('a reply, an edit or a draft does not follow to another channel', async () 
   await fireEvent.press(screen.getByRole('tab', { name: 'Dev chat' }));
   expect(screen.getByPlaceholderText('say something in Dev chat').props.value).toBe('');
 });
+
+test('a room one scan found gone can still be opened: its own poll decides', async () => {
+  mockS.rooms.setState({ gone: { [A]: true } });
+  await render(<ChatScreen />);
+  await fireEvent.press(screen.getByRole('tab', { name: 'Dev chat' }));
+  expect(mockS.chatChannel.getState().current).toBe(A);
+});

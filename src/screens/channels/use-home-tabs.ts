@@ -9,7 +9,8 @@ import { useRoomOnScreen } from './use-room-on-screen';
 
 /**
  * Home's channels as tabs, the current one's store (long-polling while the screen has the focus), and the tabs of
- * rooms no longer reachable pruned: gone, or neither joined nor listed once a listing came in.
+ * rooms no longer reachable pruned: gone (its own poll, three 404s), or neither joined nor listed once a listing came
+ * in. One scan's 404 hides nothing.
  */
 export function useHomeTabs() {
   const { rooms, homeChannels } = useServices();
@@ -17,7 +18,6 @@ export function useHomeTabs() {
   const current = useHomeChannels((s) => s.current);
   const book = useRooms((s) => s.book);
   const listed = useRooms((s) => s.listed);
-  const gone = useRooms((s) => s.gone);
   // a stable selector input: the store of the current channel
   const store = rooms.getState().room(current);
   const roomGone = useStore(store, (s) => s.gone);
@@ -26,9 +26,9 @@ export function useHomeTabs() {
 
   useEffect(() => {
     const h = homeChannels.getState();
-    for (const t of h.tabs) if (t.id && (gone[t.id] || (t.id === current && roomGone))) h.remove(t.id);
+    if (current && roomGone) h.remove(current);
     if (listed) h.prune(new Set([...book.rooms.map((r) => r.id), ...listed.map((r) => r.id)]));
-  }, [homeChannels, book, listed, gone, current, roomGone]);
+  }, [homeChannels, book, listed, current, roomGone]);
 
   // the name the room has now (renamed since it was added), else the one kept with the tab
   const nameOf = (id: string, kept: string) =>

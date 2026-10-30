@@ -388,3 +388,15 @@ test('roomInfo asks the server; a failure is null', async () => {
   h.client.info.mockRejectedValueOnce(new OffchainError(0, 'down'));
   expect(await h.rooms.getState().roomInfo(id(1))).toBeNull();
 });
+
+test('a later scan that reaches the room takes its gone mark away', async () => {
+  const h = harness({ book: { rooms: [entry(1)], left: {} } });
+  await h.rooms.getState().reloadBook();
+  h.kv.set(seenKeyFor('S', id(1)), '3');
+  h.client.scan.mockRejectedValueOnce(new OffchainError(404, 'no such room'));
+  await h.rooms.getState().scanAll();
+  expect(h.rooms.getState().gone[id(1)]).toBe(true);
+  h.client.scan.mockResolvedValueOnce(reply({ msgs: [], next: 3 }));
+  await h.rooms.getState().scanAll();
+  expect(h.rooms.getState().gone[id(1)]).toBeUndefined();
+});
