@@ -1,8 +1,6 @@
 import type { Script } from './lib/types.ts';
 
 const ROOM = 'gno devs';
-// the lines of Home's chat card, down to the tab bar (points)
-const CHAT_CARD: [number, number, number, number] = [0, 683, 402, 112];
 
 // The store build (no gnokey-mobile) on the real gno.world and gno.land mainnet, the app's defaults: nothing is set up
 // and nothing is signed. Labels as the accessibility tree reads them (2026-10-30 walk-through; trees in
@@ -21,7 +19,7 @@ const script: Script = {
   // off camera: Home has its live data before the recording starts
   setup: [
     { id: 'app', do: { launch: 'app' } },
-    // a name for the chat: without one, the first line sent opens the name sheet instead
+    // a name for the chat, as a tester would have: without one, the app asks for it first
     { id: 'chat', do: { tap: /^Chat, tab/ } },
     { id: 'me', do: { tap: 'you' } },
     { id: 'name', do: { tapEnd: 'name' } },
@@ -60,40 +58,44 @@ const script: Script = {
         { id: 'pause', do: { pause: 2500 }, mark: true },
         { id: 'back', do: { tap: 'Close' }, mark: true },
       ],
-      // the chat card's lines are other people's, live: blurred while Home is on screen, not over the full-screen cards
-      blur: [
-        { box: CHAT_CARD, until: 'price' },
-        { box: CHAT_CARD, from: 'close', until: 'here' },
-        { box: CHAT_CARD, from: 'back' },
-      ],
     },
     {
-      id: 'rooms', show: 'phone', captions: ['Channels: Public and your rooms', 'Make a room, share the link'],
-      voice: 'Chat has channels now. Public is one tab, and anyone can make a room: give it a name, keep it unlisted, and share the link. The maker gets the tools: invite by name, rename, pin a line, or delete the room.',
+      id: 'rooms', show: 'phone', captions: ['Channels: Public and the rooms', 'Make your own room'],
+      voice: 'Chat has channels now. Public is one tab, next to the rooms: switch between them in one tap. Anyone can make a room: give it a name, keep it unlisted, and share its link.',
       steps: [
         { id: 'chat', do: { tap: /^Chat, tab/ } },
         { id: 'public', do: { waitFor: 'Public' }, mark: true },
+        { id: 'look', do: { pause: 1500 }, mark: true },
+        // other rooms' tabs: their lines load from the server
+        { id: 'dev', do: { tap: 'Dev chat' }, mark: true },
+        { id: 'dev-look', do: { pause: 2500 }, mark: true },
+        { id: 'gnot', do: { tap: '$GNOT price chat' }, mark: true },
+        { id: 'gnot-look', do: { pause: 2500 }, mark: true },
         { id: 'add', do: { tap: 'New room' }, mark: true },
         { id: 'sheet', do: { waitFor: 'Make a room' }, mark: true },
         { id: 'name', do: { type: ROOM, into: 'a name for a new room' }, mark: true },
+        // the clip ends here: the share sheet the app opens next (3 s or more later) stays off camera
         { id: 'make', do: { tap: 'Make' }, mark: true },
-        // the share sheet is not in the app's tree: only its scrim is; a tap above the sheet closes it
-        { id: 'share', do: { waitFor: 'dismiss popup', timeout: 20_000 }, mark: true },
-        { id: 'shared', do: { pause: 1500 } },
-        { id: 'close-share', do: { at: [200, 200] }, mark: true },
-        { id: 'room', do: { waitFor: ROOM }, mark: true },
-        // one line, so the room is not empty on camera (typed one key at a time: no emoji)
-        { id: 'say', do: { type: 'welcome, gno devs!', into: `say something in ${ROOM}` }, mark: true },
-        { id: 'send', do: { tap: 'send' }, mark: true },
-        { id: 'said', do: { waitFor: 'welcome, gno devs!' }, mark: true },
+      ],
+    },
+    {
+      id: 'tools', show: 'phone', captions: ['Maker tools: invite, rename, pin, delete'],
+      voice: 'The maker gets the tools: invite people by name, rename the room, pin a line, or delete it.',
+      steps: [
+        // off camera: the share sheet is not in the app's tree, only its scrim is; a tap above the sheet closes it
+        { id: 'share', do: { waitFor: 'dismiss popup', timeout: 20_000 } },
+        { id: 'shared', do: { pause: 1000 } },
+        { id: 'close-share', do: { at: [200, 200] } },
+        { id: 'room', do: { waitFor: ROOM } },
+        { id: 'settle', do: { pause: 1000 } },
+        // the clip starts here, the share sheet gone
+        { id: 'shown', do: { waitFor: ROOM }, mark: true },
         { id: 'menu', do: { tap: 'Channel menu' }, mark: true },
         { id: 'tools', do: { waitFor: 'Delete room' }, mark: true },
-        { id: 'look', do: { pause: 2000 }, mark: true },
+        { id: 'look', do: { pause: 3000 }, mark: true },
         // the menu sheet has no close button: a tap above it
         { id: 'menu-close', do: { at: [200, 250] }, mark: true },
       ],
-      // Public's lines are other people's, live (one gave GPS coordinates): blurred under the tabs until the sheet covers them
-      blur: [{ box: [0, 178, 402, 569], until: 'sheet' }],
     },
     {
       id: 'session', show: 'phone', captions: ['gnokey-mobile: coming soon', 'A session from your computer, today'],

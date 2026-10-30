@@ -21,10 +21,6 @@ const Screen = ({ scene, edl }: { scene: EdlScene; edl: Edl }) => {
           <Freeze frame={played - 1}>{video}</Freeze>
         </Sequence>
       ) : null}
-      {(scene.blur ?? []).filter((b) => f >= b.from && f < b.to).map((b, i) => (
-        <div key={i} style={{ position: 'absolute', left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%`,
-          backdropFilter: 'blur(14px)' }} />
-      ))}
     </div>
   );
 };
