@@ -1,24 +1,29 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useRef } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useStore } from 'zustand';
 
 import { useNow } from '@/hooks/use-now';
 import { isMine } from '@/offchain/chat/merge';
 import type { ChatLine } from '@/offchain/chat/types';
+import { ChannelTabs } from '@/screens/channels/channel-tabs';
+import { useHomeTabs } from '@/screens/channels/use-home-tabs';
 import { ChatLineRow } from '@/screens/chat/chat-line';
 import { useServices } from '@/state/app-services';
 import { useSettings } from '@/state/settings';
 import { colors, space } from '@/theme';
 
 import { FullHeader, useBottomGap } from './full-header';
+import { ShowOnHome } from './show-on-home';
 
 const NO_REACTIONS: string[] = [];
 const nothing = () => {};
 
-/** The chat to read: the Chat tab's lines, live, with nothing to write, react or vote with. */
+/** The chat to read: Home's channels, live, with nothing to write, react or vote with. */
 export function ChatFull() {
-  const { chat } = useServices();
+  const { homeChannels } = useServices();
+  const { channels, current, name, store: chat, select } = useHomeTabs();
+  const [picking, setPicking] = useState(false);
   const s = useStore(chat);
   const offchainUrl = useSettings((st) => st.offchainUrl);
   const now = useNow(15000);
@@ -51,6 +56,14 @@ export function ChatFull() {
   return (
     <View style={styles.root}>
       <FullHeader title="CHAT" right={<Text style={styles.here}>{s.here} here</Text>} />
+      <ChannelTabs
+        channels={channels} current={current} onSelect={select} onAdd={() => setPicking(true)}
+        onLongPress={(id) =>
+          Alert.alert(channels.find((c) => c.id === id)?.name ?? '', undefined, [
+            { text: 'Remove from Home', style: 'destructive', onPress: () => homeChannels.getState().remove(id) },
+            { text: 'Cancel', style: 'cancel' },
+          ])}
+      />
       {s.phase === 'unreachable' ? <Text style={styles.down}>chat unreachable — retrying</Text> : null}
       <FlatList
         ref={list}
@@ -63,9 +76,13 @@ export function ChatFull() {
         onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: index * 80, animated: true })}
         renderItem={renderItem}
       />
-      <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/chat')} style={[styles.foot, { paddingBottom: bottom }]}>
-        <Text style={styles.write}>Write in Chat ›</Text>
+      {/* to the Chat tab, on the channel read here */}
+      <Pressable
+        accessibilityRole="button" onPress={() => router.dismissTo({ pathname: '/chat', params: current ? { room: current } : {} })}
+        style={[styles.foot, { paddingBottom: bottom }]}>
+        <Text style={styles.write} numberOfLines={1}>Write in {name} ›</Text>
       </Pressable>
+      <ShowOnHome visible={picking} onClose={() => setPicking(false)} />
     </View>
   );
 }
@@ -75,5 +92,5 @@ const styles = StyleSheet.create({
   here: { color: colors.fg },
   down: { color: colors.bad, textAlign: 'center', paddingBottom: space.xs },
   foot: { borderTopColor: colors.line, borderTopWidth: 1, paddingTop: space.m, alignItems: 'center' },
-  write: { color: colors.accent, fontWeight: '600' },
+  write: { color: colors.accent, fontWeight: '600', paddingHorizontal: space.l },
 });

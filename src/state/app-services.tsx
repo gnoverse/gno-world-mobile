@@ -18,6 +18,7 @@ import { expoCrypto } from '@/offchain/sync/expo-crypto';
 import type { SyncState } from '@/offchain/sync/store';
 import { createSessionStore, type SessionState } from '@/session/store';
 import { walletEnabled } from '@/session/wallet-build';
+import { createHomeChannels, type HomeChannelsState } from '@/screens/channels/home-channels';
 import { createChatServices } from '@/state/chat-services';
 import { createNetworkSync } from '@/state/network-sync';
 import { settingsStore, watchHydration } from '@/state/settings';
@@ -39,6 +40,8 @@ interface Services {
   sync: StoreApi<SyncState>;
   /** the rooms: the book, the listed ones, a store per room */
   rooms: StoreApi<RoomsState>;
+  /** the channels Home's chat card shows */
+  homeChannels: StoreApi<HomeChannelsState> & { ready: Promise<void> };
 }
 
 const Ctx = createContext<Services | null>(null);
@@ -72,6 +75,7 @@ export function AppServices({ children }: PropsWithChildren) {
       // a name the server wants proven: the wallet signs the phrase (GnoConnect connect + challenge)
       wallet: walletEnabled ? { open: (url) => Linking.openURL(url).then(() => undefined), randomHex, network: () => net.current() } : undefined,
     });
+    const homeChannels = createHomeChannels({ kv: AsyncStorage, scope: () => settingsStore.getState().offchainUrl });
     const session = createSessionStore({
       api: () => api,
       secrets: secureStore,
@@ -82,7 +86,7 @@ export function AppServices({ children }: PropsWithChildren) {
       network: () => net.current(),
       wallet: walletEnabled,
     });
-    return { api, game: new GameClient(api, () => net.current().chainId), offchain, session, net, chat, identity: identityState, chatClient, sync, rooms };
+    return { api, game: new GameClient(api, () => net.current().chainId), offchain, session, net, chat, identity: identityState, chatClient, sync, rooms, homeChannels };
   }, [api]);
 
   // follow network switches from Settings: gnonative first, then the session store
@@ -157,6 +161,7 @@ export function AppServices({ children }: PropsWithChildren) {
         services.identity.getState().restart();
         chat().restart();
         rooms().restart();
+        void services.homeChannels.getState().reload();
       }
     });
     return () => {
@@ -210,6 +215,10 @@ export function useIdentity<T>(sel: (s: IdentityState) => T): T {
 
 export function useRooms<T>(sel: (s: RoomsState) => T): T {
   return useStore(useServices().rooms, sel);
+}
+
+export function useHomeChannels<T>(sel: (s: HomeChannelsState) => T): T {
+  return useStore(useServices().homeChannels, sel);
 }
 
 export function useSync<T>(sel: (s: SyncState) => T): T {
