@@ -4,7 +4,7 @@ import type { ColorValue } from 'react-native';
 
 import { unreadCount } from '@/offchain/chat/merge';
 import { chatTabLabel } from '@/screens/chat/line-model';
-import { useChat } from '@/state/app-services';
+import { useChat, useRooms } from '@/state/app-services';
 import { colors } from '@/theme';
 
 const icon = (name: SymbolViewProps['name']) =>
@@ -13,7 +13,8 @@ const icon = (name: SymbolViewProps['name']) =>
   };
 
 export default function TabsLayout() {
-  const unread = useChat((s) => unreadCount(s, s.lastSeen, s.mine));
+  // Public's, plus what the scans counted in the rooms joined
+  const unread = useChat((s) => unreadCount(s, s.lastSeen, s.mine)) + useRooms((r) => r.book.rooms.reduce((n, e) => n + r.unreadOf(e.id), 0));
   return (
     <Tabs
       screenOptions={{
