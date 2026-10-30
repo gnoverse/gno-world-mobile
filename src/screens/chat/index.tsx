@@ -8,7 +8,7 @@ import { ChannelTabs } from '@/screens/channels/channel-tabs';
 import { chatRow } from '@/screens/channels/chat-channels';
 import { useRoomOnScreen } from '@/screens/channels/use-room-on-screen';
 import { Banner } from '@/screens/rooms/banner';
-import { MenuSheet } from '@/screens/rooms/menu-sheet';
+import { RoomMenu } from '@/screens/rooms/room-menu';
 import { useChatChannel, useRooms, useServices, useSession } from '@/state/app-services';
 import { useSettings } from '@/state/settings';
 
@@ -84,7 +84,7 @@ export function ChatScreen() {
   const name = channel?.name ?? 'Public';
   return (
     <View style={{ flex: 1 }}>
-      <ChatHeader here={here} me={me} onOpenIdentity={() => setSheet(true)} onAdd={() => undefined} onMenu={() => setMenu(true)} />
+      <ChatHeader here={here} me={me} onOpenIdentity={() => setSheet(true)} onAdd={() => router.push('/rooms/new')} onMenu={() => setMenu(true)} />
       <ChannelTabs channels={channels} current={current} onSelect={select} separatorAfter={separatorAfter} />
       {banner ? (
         <Banner
@@ -101,10 +101,7 @@ export function ChatScreen() {
         placeholder={`say something in ${name}`} canModerate={!!current && !!rooms.getState().keyOf(current)}
       />
       <IdentitySheet store={identity} visible={sheet} onClose={() => setSheet(false)} offchainUrl={offchainUrl} identity={active?.master ?? ''} />
-      <MenuSheet
-        title={current ? name : undefined} visible={menu} onClose={() => setMenu(false)}
-        items={[{ label: 'Pair with a browser', onPress: () => router.push('/pair') }]}
-      />
+      <RoomMenu id={current} visible={menu} onClose={() => setMenu(false)} onLeft={() => chatChannel.getState().select('')} />
     </View>
   );
 }

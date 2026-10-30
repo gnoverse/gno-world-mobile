@@ -121,8 +121,18 @@ test('the header shows who is here, the name pill, ＋ and ⋯', async () => {
   await render(<ChatScreen />);
   expect(screen.getByText('Chat · 26 here')).toBeTruthy();
   expect(screen.getByRole('button', { name: 'you' })).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'New room' })).toBeTruthy();
   expect(screen.getByRole('button', { name: 'Channel menu' })).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'New room' }));
+  expect(router.push).toHaveBeenCalledWith('/rooms/new');
+});
+
+test('Leave in ⋯ goes back to Public', async () => {
+  mockS.chatChannel.getState().select(A);
+  await render(<ChatScreen />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Channel menu' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Leave' }));
+  await act(async () => undefined);
+  expect(mockS.chatChannel.getState().current).toBe('');
 });
 
 test('⋯ on Public offers only Pair with a browser', async () => {

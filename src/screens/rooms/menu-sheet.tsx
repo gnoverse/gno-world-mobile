@@ -13,7 +13,7 @@ export function MenuSheet({ title, items, visible, onClose }: { title?: string; 
           {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
           {items.map((it) => (
             <Pressable
-              key={it.label} accessibilityRole="button" style={styles.item}
+              key={it.label} accessibilityRole="button" accessibilityLabel={it.label} style={styles.item}
               onPress={() => {
                 onClose();
                 it.onPress();

@@ -6,7 +6,7 @@ import type { RoomInvite } from '@/offchain/chat/types';
 import { OffchainError } from '@/offchain/http';
 import { EMPTY_BOOK, forgetRoom, rememberRoom, type Book, type BookStore } from '@/offchain/sync/rooms';
 
-import type { ListedRoom, RoomsClient } from './client';
+import type { ListedRoom, RoomInfo, RoomsClient } from './client';
 import { parseRoomLink } from './link';
 
 type ChatStore = StoreApi<ChatState> & { ready: Promise<void> };
@@ -61,6 +61,8 @@ export interface RoomsState {
   invite(id: string, to: string, tag: string): Promise<string>;
   onInvites(dm: RoomInvite[]): void;
   scanAll(): Promise<void>;
+  /** what the server says of a room now (listed or not); null when it did not answer */
+  roomInfo(id: string): Promise<RoomInfo | 'gone' | null>;
   refreshListed(): Promise<void>;
   /** the listing and the scan now, unless they ran in the last 10 s */
   poke(): void;
@@ -331,6 +333,7 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
           }
         }
       },
+      roomInfo: (id) => d.client.info(id).catch(() => null),
       refreshListed: async () => {
         const e = epoch;
         try {

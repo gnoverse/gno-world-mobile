@@ -350,3 +350,11 @@ test('reloadBook: a room left elsewhere closes its store', async () => {
   expect(s.getState().phase).toBe('idle');
   expect(h.rooms.getState().focused).toBe('');
 });
+
+test('roomInfo asks the server; a failure is null', async () => {
+  const h = harness();
+  h.client.info.mockResolvedValueOnce({ id: id(1), name: 'a', listed: true, here: 1, made: 1 });
+  expect(await h.rooms.getState().roomInfo(id(1))).toMatchObject({ listed: true });
+  h.client.info.mockRejectedValueOnce(new OffchainError(0, 'down'));
+  expect(await h.rooms.getState().roomInfo(id(1))).toBeNull();
+});
