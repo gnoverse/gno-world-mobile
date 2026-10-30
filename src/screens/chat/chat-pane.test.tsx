@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { KeyboardAvoidingView, Platform, StyleSheet, TextInput } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 
 import type { ChatClient } from '@/offchain/chat/client';
 import { NO_IDENTITY, type ChatIdentity } from '@/offchain/chat/identity';
@@ -49,7 +49,6 @@ test('the screen shows lines, pins, the bot mark, a placeholder and the unreacha
   // the loop loads once, then fails and waits forever: settle it before rendering (no update outside act)
   await waitFor(() => expect(store.getState().phase).toBe('unreachable'));
   await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" />);
-  expect(screen.getByText('Chat · 26 here')).toBeTruthy();
   expect(screen.getAllByText('hello').length).toBeGreaterThanOrEqual(1); // the line and its pin
   expect(screen.getByText(/🤖/)).toBeTruthy();
   expect(screen.getByText('📎 picture')).toBeTruthy();
@@ -118,7 +117,6 @@ test('a typing update, a new count of people here or a new "you" does not re-ren
   await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" />);
   const before = (splitLinks as jest.Mock).mock.calls.length;
   await act(() => store.setState({ typing: [{ name: 'bob', n: 3 }], here: 9, you: { cc: 'FR', tag: 'aaaa' } }));
-  expect(screen.getByText('Chat · 9 here')).toBeTruthy();
   expect((splitLinks as jest.Mock).mock.calls.length).toBe(before);
   await act(() => store.getState().stop());
 });
@@ -199,27 +197,54 @@ test('Send without a name, then Reserve: the line waits for the reservation, and
   await act(() => store.getState().stop());
 });
 
-test('the header opens the pairing screen', async () => {
-  const store = createChatStore({
-    client: {} as ChatClient, identity: () => ids.getState().identity,
-    kv: { getItem: async () => null, setItem: async () => undefined },
-  });
-  const onOpenPair = jest.fn();
-  await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" onOpenPair={onOpenPair} />);
-  await fireEvent.press(screen.getByLabelText('Pair with another device'));
-  expect(onOpenPair).toHaveBeenCalled();
+test('with canModerate the line menu offers Pin and Delete; Delete asks first', async () => {
+  const { store } = storeWith({ ...NO_IDENTITY, name: 'ann' });
+  const pin = jest.fn(async () => undefined);
+  const deleteLine = jest.fn(async () => undefined);
+  store.setState({ pin, deleteLine });
+  store.getState().start();
+  await waitFor(() => expect(store.getState().phase).toBe('unreachable'));
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" canModerate />);
+  await fireEvent(screen.getByText('his line'), 'longPress');
+  await fireEvent.press(screen.getByText('Pin'));
+  expect(pin).toHaveBeenCalledWith(2, true);
+  await fireEvent(screen.getByText('his line'), 'longPress');
+  await fireEvent.press(screen.getByText('Delete'));
+  expect(deleteLine).not.toHaveBeenCalled();
+  expect(alert.mock.calls[0][0]).toBe('Delete this line for everyone?');
+  await act(async () => alert.mock.calls[0][2]!.find((b) => b.text === 'Delete')!.onPress!());
+  expect(deleteLine).toHaveBeenCalledWith(2);
+  alert.mockRestore();
+  await act(() => store.getState().stop());
 });
 
-test('a long reserved name stays on one line and the title gives way', async () => {
-  const long = 'n'.repeat(40);
-  const store = createChatStore({
-    client: {} as ChatClient, identity: () => ids.getState().identity,
-    kv: { getItem: async () => null, setItem: async () => undefined },
-  });
-  ids = idsWith({ ...NO_IDENTITY, name: long, reservedName: long, nameKey: 'a'.repeat(32) });
+test('a pinned line offers Unpin', async () => {
+  const { store } = storeWith({ ...NO_IDENTITY, name: 'ann' }, [line(2, { name: 'bob', body: 'his line', pinned: true })]);
+  const pin = jest.fn(async () => undefined);
+  store.setState({ pin });
+  store.getState().start();
+  await waitFor(() => expect(store.getState().phase).toBe('unreachable'));
+  await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" canModerate />);
+  await fireEvent(screen.getAllByText('his line')[0], 'longPress');
+  await fireEvent.press(screen.getByText('Unpin'));
+  expect(pin).toHaveBeenCalledWith(2, false);
+  await act(() => store.getState().stop());
+});
+
+test('without the maker key, neither Pin nor Delete shows', async () => {
+  const { store } = storeWith({ ...NO_IDENTITY, name: 'ann' });
+  store.getState().start();
+  await waitFor(() => expect(store.getState().phase).toBe('unreachable'));
   await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" />);
-  expect(screen.getByText(`${long} ✓`).props.numberOfLines).toBe(1);
-  const title = screen.getByText(/^Chat · /);
-  expect(title.props.numberOfLines).toBe(1);
-  expect(StyleSheet.flatten(title.props.style)).toMatchObject({ flexShrink: 1 });
+  await fireEvent(screen.getByText('his line'), 'longPress');
+  expect(screen.queryByText('Pin')).toBeNull();
+  expect(screen.queryByText('Delete')).toBeNull();
+  await act(() => store.getState().stop());
+});
+
+test('the composer\'s placeholder is the one given', async () => {
+  const { store } = storeWith({ ...NO_IDENTITY, name: 'ann' });
+  await render(<ChatPane store={store} identity={ids} offchainUrl="http://fake" placeholder="say something in Dev chat" />);
+  expect(screen.getByPlaceholderText('say something in Dev chat')).toBeTruthy();
 });

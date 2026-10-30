@@ -18,6 +18,7 @@ import { expoCrypto } from '@/offchain/sync/expo-crypto';
 import type { SyncState } from '@/offchain/sync/store';
 import { createSessionStore, type SessionState } from '@/session/store';
 import { walletEnabled } from '@/session/wallet-build';
+import { createChatChannel, type ChatChannelState } from '@/screens/channels/chat-channels';
 import { createHomeChannels, type HomeChannelsState } from '@/screens/channels/home-channels';
 import { createChatServices } from '@/state/chat-services';
 import { createNetworkSync } from '@/state/network-sync';
@@ -42,6 +43,8 @@ interface Services {
   rooms: StoreApi<RoomsState>;
   /** the channels Home's chat card shows */
   homeChannels: StoreApi<HomeChannelsState> & { ready: Promise<void> };
+  /** the channel the Chat tab shows */
+  chatChannel: StoreApi<ChatChannelState> & { ready: Promise<void> };
 }
 
 const Ctx = createContext<Services | null>(null);
@@ -76,6 +79,7 @@ export function AppServices({ children }: PropsWithChildren) {
       wallet: walletEnabled ? { open: (url) => Linking.openURL(url).then(() => undefined), randomHex, network: () => net.current() } : undefined,
     });
     const homeChannels = createHomeChannels({ kv: AsyncStorage, scope: () => settingsStore.getState().offchainUrl });
+    const chatChannel = createChatChannel({ kv: AsyncStorage, scope: () => settingsStore.getState().offchainUrl });
     const session = createSessionStore({
       api: () => api,
       secrets: secureStore,
@@ -86,7 +90,7 @@ export function AppServices({ children }: PropsWithChildren) {
       network: () => net.current(),
       wallet: walletEnabled,
     });
-    return { api, game: new GameClient(api, () => net.current().chainId), offchain, session, net, chat, identity: identityState, chatClient, sync, rooms, homeChannels };
+    return { api, game: new GameClient(api, () => net.current().chainId), offchain, session, net, chat, identity: identityState, chatClient, sync, rooms, homeChannels, chatChannel };
   }, [api]);
 
   // follow network switches from Settings: gnonative first, then the session store
@@ -162,6 +166,7 @@ export function AppServices({ children }: PropsWithChildren) {
         chat().restart();
         rooms().restart();
         void services.homeChannels.getState().reload();
+        void services.chatChannel.getState().reload();
       }
     });
     return () => {
@@ -219,6 +224,10 @@ export function useRooms<T>(sel: (s: RoomsState) => T): T {
 
 export function useHomeChannels<T>(sel: (s: HomeChannelsState) => T): T {
   return useStore(useServices().homeChannels, sel);
+}
+
+export function useChatChannel<T>(sel: (s: ChatChannelState) => T): T {
+  return useStore(useServices().chatChannel, sel);
 }
 
 export function useSync<T>(sel: (s: SyncState) => T): T {

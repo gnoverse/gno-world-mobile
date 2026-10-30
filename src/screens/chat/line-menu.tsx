@@ -4,9 +4,11 @@ import { REACTIONS } from '@/offchain/chat/client';
 import type { ChatLine } from '@/offchain/chat/types';
 import { colors, radius, space } from '@/theme';
 
-export function LineMenu({ line, canEdit, canWithdraw, onClose, onReply, onEdit, onReact, onWithdraw }: {
+export function LineMenu({ line, canEdit, canWithdraw, onClose, onReply, onEdit, onReact, onWithdraw, onPin, onDelete }: {
   line: ChatLine | null; canEdit: boolean; canWithdraw: boolean; onClose: () => void;
   onReply: (l: ChatLine) => void; onEdit: (l: ChatLine) => void; onReact: (l: ChatLine, emoji: string) => void; onWithdraw: () => void;
+  /** the room's maker: pin or unpin, remove for everyone */
+  onPin?: (l: ChatLine, on: boolean) => void; onDelete?: (l: ChatLine) => void;
 }) {
   const pick = (f: () => void) => () => {
     f();
@@ -28,6 +30,8 @@ export function LineMenu({ line, canEdit, canWithdraw, onClose, onReply, onEdit,
             <Item label="Reply" onPress={pick(() => onReply(line))} />
             {canEdit ? <Item label="Edit" onPress={pick(() => onEdit(line))} /> : null}
             {canWithdraw ? <Item label="Take back" danger onPress={pick(onWithdraw)} /> : null}
+            {onPin ? <Item label={line.pinned ? 'Unpin' : 'Pin'} onPress={pick(() => onPin(line, !line.pinned))} /> : null}
+            {onDelete ? <Item label="Delete" danger onPress={pick(() => onDelete(line))} /> : null}
           </View>
         ) : null}
       </Pressable>

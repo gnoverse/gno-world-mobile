@@ -4,6 +4,7 @@ import type { ListedRoom, RoomsClient } from '@/offchain/rooms/client';
 import { createRoomsStore } from '@/offchain/rooms/store';
 import { EMPTY_BOOK, type Book } from '@/offchain/sync/rooms';
 
+import { createChatChannel } from './chat-channels';
 import { createHomeChannels } from './home-channels';
 
 /** Screen-test services: Public, a rooms registry over an in-memory book and a fake rooms client, Home's channels. */
@@ -32,5 +33,9 @@ export function screenServices(o: { book?: Book; listed?: ListedRoom[] | null; c
   });
   rooms.setState({ book: held, listed: o.listed === undefined ? [] : o.listed });
   const homeChannels = createHomeChannels({ kv: kvs, scope });
-  return { chat, rooms, homeChannels, client, kv, book: () => held, ready: Promise.all([chat.ready, homeChannels.ready]) };
+  const chatChannel = createChatChannel({ kv: kvs, scope });
+  return {
+    chat, rooms, homeChannels, chatChannel, client, kv, book: () => held,
+    ready: Promise.all([chat.ready, homeChannels.ready, chatChannel.ready]),
+  };
 }

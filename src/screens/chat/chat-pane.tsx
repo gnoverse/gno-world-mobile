@@ -1,7 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, FlatList, KeyboardAvoidingView, StyleSheet, Text } from 'react-native';
 import { useStore, type StoreApi } from 'zustand';
 
 import { useNow } from '@/hooks/use-now';
@@ -19,14 +18,16 @@ import { Pins } from './pins';
 
 const NO_REACTIONS: string[] = [];
 
-export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, onOpenPair, identityOpen }: {
-  store: StoreApi<ChatState>; identity: StoreApi<IdentityState>; offchainUrl: string; onOpenIdentity?: () => void; onOpenPair?: () => void;
+export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, identityOpen, placeholder, canModerate }: {
+  store: StoreApi<ChatState>; identity: StoreApi<IdentityState>; offchainUrl: string; onOpenIdentity?: () => void;
   /** the name sheet is showing */
   identityOpen?: boolean;
+  placeholder?: string;
+  /** the app holds the room's maker key: lines can be pinned and removed */
+  canModerate?: boolean;
 }) {
   const s = useStore(store);
   const me = useStore(identity, (i) => i.identity);
-  const insets = useSafeAreaInsets();
   const now = useNow(15000);
   const list = useRef<FlatList<ChatLine>>(null);
   const [reply, setReply] = useState<ChatLine | null>(null);
@@ -76,17 +77,6 @@ export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, onOpenP
   return (
     // padding on Android too: with edge-to-edge (android/gradle.properties) the window keeps its size under the keyboard
     <KeyboardAvoidingView style={styles.root} behavior="padding">
-      <View style={[styles.header, { paddingTop: insets.top + space.s }]}>
-        <Text style={styles.title} numberOfLines={1}>Chat · {s.here} here</Text>
-        <View style={styles.headerRight}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Pair with another device" onPress={onOpenPair} style={styles.you}>
-            <Text style={styles.youText}>pair</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={onOpenIdentity} style={styles.you}>
-            <Text style={styles.youText} numberOfLines={1}>{myName || 'you'}{me.reservedName ? ' ✓' : ''}</Text>
-          </Pressable>
-        </View>
-      </View>
       {s.phase === 'unreachable' ? <Text style={styles.down}>server unreachable — retrying</Text> : null}
       <Pins pins={s.pins} onJump={jumpTo} />
       <FlatList
@@ -125,6 +115,7 @@ export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, onOpenP
         }}
         onDismissError={() => store.getState().clearError()}
         bottomInset={0}
+        placeholder={placeholder}
       />
       <LineMenu
         line={menuFor}
@@ -143,6 +134,12 @@ export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, onOpenP
         }}
         onReact={(l, e) => void store.getState().react(l.id, e)}
         onWithdraw={() => void store.getState().withdraw()}
+        onPin={canModerate ? (l, on) => void store.getState().pin(l.id, on) : undefined}
+        onDelete={canModerate ? (l) =>
+          Alert.alert('Delete this line for everyone?', undefined, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Delete', style: 'destructive', onPress: () => void store.getState().deleteLine(l.id) },
+          ]) : undefined}
       />
     </KeyboardAvoidingView>
   );
@@ -150,11 +147,5 @@ export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, onOpenP
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  // a reserved name of up to 40 characters: the title gives way, the name pill ends with an ellipsis
-  headerRight: { flexDirection: 'row', gap: space.s, flexShrink: 1, marginLeft: space.s },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: space.l, paddingBottom: space.s },
-  title: { color: colors.fg, fontSize: 17, fontWeight: '700', flexShrink: 1 },
-  you: { borderColor: colors.line, borderWidth: 1, borderRadius: 14, paddingHorizontal: space.m, paddingVertical: space.xs, flexShrink: 1 },
-  youText: { color: colors.fg },
   down: { color: colors.bad, textAlign: 'center', paddingBottom: space.xs },
 });
