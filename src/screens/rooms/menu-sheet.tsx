@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Modal, Pressable, StyleSheet, Text } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors, radius, space } from '@/theme';
 
@@ -17,8 +17,8 @@ export function MenuSheet({ title, items, visible, onClose, children }: {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessible={false}>
-        {/* a tap inside the sheet stays there */}
-        <Pressable style={styles.sheet} accessible={false}>
+        {/* a tap inside the sheet stays there (a Pressable here would hide the items from VoiceOver) */}
+        <View style={styles.sheet} onStartShouldSetResponder={() => true}>
           {title ? <Text style={styles.title} numberOfLines={1}>{title}</Text> : null}
           {children ?? items.map((it) => (
             <Pressable
@@ -31,7 +31,7 @@ export function MenuSheet({ title, items, visible, onClose, children }: {
               {it.detail ? <Text style={styles.detail}>{it.detail}</Text> : null}
             </Pressable>
           ))}
-        </Pressable>
+        </View>
       </Pressable>
     </Modal>
   );
