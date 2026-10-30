@@ -1,6 +1,8 @@
 import type { Script } from './lib/types.ts';
 
 const ROOM = 'gno devs';
+// the lines of Home's chat card, down to the tab bar (points)
+const CHAT_CARD: [number, number, number, number] = [0, 683, 402, 112];
 
 // The store build (no gnokey-mobile) on the real gno.world and gno.land mainnet, the app's defaults: nothing is set up
 // and nothing is signed. Labels as the accessibility tree reads them (2026-10-30 walk-through; trees in
@@ -35,6 +37,7 @@ const script: Script = {
     { id: 'home', do: { waitFor: 'Open GNOT full screen', timeout: 60_000 } },
     { id: 'here', do: { waitFor: 'Open Here Now full screen', timeout: 60_000 } },
   ],
+  // no zoomOn: a zoom inside the phone crops every line on the right; the screen reads at full size
   scenes: [
     {
       id: 'title', show: 'card', captions: [],
@@ -57,12 +60,17 @@ const script: Script = {
         { id: 'pause', do: { pause: 2500 }, mark: true },
         { id: 'back', do: { tap: 'Close' }, mark: true },
       ],
+      // the chat card's lines are other people's, live: blurred while Home is on screen, not over the full-screen cards
+      blur: [
+        { box: CHAT_CARD, until: 'price' },
+        { box: CHAT_CARD, from: 'close', until: 'here' },
+        { box: CHAT_CARD, from: 'back' },
+      ],
     },
     {
       id: 'rooms', show: 'phone', captions: ['Channels: Public and your rooms', 'Make a room, share the link'],
       voice: 'Chat has channels now. Public is one tab, and anyone can make a room: give it a name, keep it unlisted, and share the link. The maker gets the tools: invite by name, rename, pin a line, or delete the room.',
       steps: [
-        // the clip starts on the channel tabs, zoomed: the Public chat's lines are other people's, live
         { id: 'chat', do: { tap: /^Chat, tab/ } },
         { id: 'public', do: { waitFor: 'Public' }, mark: true },
         { id: 'add', do: { tap: 'New room' }, mark: true },
@@ -84,7 +92,8 @@ const script: Script = {
         // the menu sheet has no close button: a tap above it
         { id: 'menu-close', do: { at: [200, 250] }, mark: true },
       ],
-      zoomOn: ['public', 'said', 'tools'],
+      // Public's lines are other people's, live (one gave GPS coordinates): blurred under the tabs until the sheet covers them
+      blur: [{ box: [0, 178, 402, 569], until: 'sheet' }],
     },
     {
       id: 'session', show: 'phone', captions: ['gnokey-mobile: coming soon', 'A session from your computer, today'],
@@ -100,7 +109,6 @@ const script: Script = {
         { id: 'end', do: { waitFor: 'I ran it' }, mark: true },
         { id: 'look', do: { pause: 2000 }, mark: true },
       ],
-      zoomOn: ['soon', 'command'],
     },
     {
       id: 'join', show: 'card', captions: [],

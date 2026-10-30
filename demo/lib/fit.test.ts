@@ -119,6 +119,22 @@ test('a zoom lets go after its hold, unless the next one comes first', () => {
   assert.deepEqual(close.scenes[0].zoom.map((k) => k.scale > 1), [false, true, true, false]);
 });
 
+test('a blur covers its box, in screen fractions, between its steps; the clip start and the scene end by default', () => {
+  const s = script([phone('chat', ['a', 'b', 'c'], { blur: [{ box: [0, 218.5, 402, 437], until: 'b' }, { box: [0, 0, 201, 874], from: 'c' }] })]);
+  const e = buildEdl(s, timeline([{ id: 'chat.a', t: 10 }, { id: 'chat.b', t: 12 }, { id: 'chat.c', t: 13 }]), { chat: { file: 'v.wav', seconds: 10 } }, []);
+  // clip starts at 9.7 and plays at 1×
+  assert.deepEqual(e.scenes[0].blur, [
+    { x: 0, y: 0.25, w: 1, h: 0.5, from: 0, to: Math.round(2.3 * FPS) },
+    { x: 0, y: 0, w: 0.5, h: 1, from: Math.round(3.3 * FPS), to: e.scenes[0].duration },
+  ]);
+});
+
+test('a blur at a step that is not a marked one is a script error, named', () => {
+  const s = script([phone('chat', ['a'], { blur: [{ box: [0, 0, 10, 10], until: 'nope' }] })]);
+  assert.throws(() => buildEdl(s, timeline([{ id: 'chat.a', t: 1 }]), { chat: { file: 'v.wav', seconds: 3 } }, []),
+    /scene chat: blur at nope is not a marked step/);
+});
+
 test('a zoom on a step that is not a marked one is a script error, named', () => {
   const s = script([phone('connect', ['a'], { zoomOn: ['nope'] })]);
   assert.throws(() => buildEdl(s, timeline([{ id: 'connect.a', t: 1 }]), { connect: { file: 'v.wav', seconds: 3 } }, []),

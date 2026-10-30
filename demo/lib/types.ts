@@ -59,6 +59,9 @@ export interface Scene {
   steps?: Step[];
   /** step ids whose box the camera zooms to when they happen */
   zoomOn?: string[];
+  /** boxes of the screen (points: x, y, w, h) blurred from the marked step `from` (or the clip's start) until the marked
+   * step `until` (or the scene's end): other people's live content */
+  blur?: { box: [number, number, number, number]; from?: string; until?: string }[];
 }
 
 export interface Script {
@@ -94,6 +97,8 @@ export interface EdlScene {
   /** for phone scenes: the source clip in sim.mp4 */
   clip?: { start: number; end: number; rate: number; holdFrames: number };
   zoom: ZoomKey[];
+  /** the blurred boxes, in fractions of the screen, from frame `from` to frame `to` */
+  blur?: { x: number; y: number; w: number; h: number; from: number; to: number }[];
   captions: CaptionCue[];
   voice?: { src: string; from: number };
   /** terminal output for this scene, t already mapped to scene frames */

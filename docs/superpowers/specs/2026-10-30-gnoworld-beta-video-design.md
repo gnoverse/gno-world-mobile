@@ -5,9 +5,11 @@ Les choix marqués *(choix de Claude)* sont à relire.
 
 **Livré le 2026-10-30** (plan `docs/superpowers/plans/2026-10-30-gnoworld-beta-video.md`) : `DEMO=beta npm run demo`
 rend 79,3 s, `demo:check` vert. Écarts : un nom de chat (« demo ») posé hors caméra (sans nom, le premier message
-ouvre la feuille du nom) ; une ligne « welcome, gno devs! » dans le salon ; la scène des salons s'ouvre zoomée sur les
-onglets pour ne pas montrer les lignes du chat Public (une ligne d'un utilisateur donnait des coordonnées GPS) ; les
-lignes des cartes passent de 32 à 40 px.
+ouvre la feuille du nom) ; une ligne « welcome, gno devs! » dans le salon ; les lignes des cartes passent de 32 à 40 px.
+Revu le 2026-10-31 : plus aucun zoom (un zoom dans le téléphone coupait chaque ligne à droite) ; les lignes du chat
+Public sont floutées (champ `blur` d'une scène, par intervalles entre deux étapes) sur la carte chat de Home et sous les
+onglets de l'onglet Chat, la dernière ligne d'un utilisateur donnant des coordonnées GPS — une nouvelle prise ne l'aurait
+pas évitée.
 
 Une deuxième vidéo, produite par commande comme la première (`docs/superpowers/specs/2026-10-13-gnoworld-demo-video-design.md`,
 pipeline `demo/`), qui montre aux devs gno **ce qui a changé depuis la démo du 13 octobre** et les **invite à rejoindre la
@@ -77,7 +79,7 @@ dans la feuille de partage ; il est supprimé hors caméra après la prise (« D
 de la vidéo ne mène nulle part.
 
 **Le chat réel** : Home et l'onglet Chat montrent les vrais messages du moment. Le relecteur regarde les planches ; un
-message inconvenant ou trop personnel → nouvelle prise *(choix de Claude ; pas de flou)*.
+message inconvenant ou trop personnel → flou sur les lignes du chat (voir le statut en tête).
 
 **La commande de session** montre l'adresse de la clé de session générée sur le simulateur (pas de secret) ; la session
 n'est jamais accordée (on ne lance pas la commande).

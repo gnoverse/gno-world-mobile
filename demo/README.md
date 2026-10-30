@@ -32,8 +32,9 @@ DEMO=beta npm run demo         # capture, voice, render, check (about 6 min)
 ```
 
 The room it makes on camera ("gno devs", unlisted) is deleted after the recording (the script's `teardown`, run even
-when a scene fails; check the log for `teardown:` errors). The chat on screen is live: look at the contact sheets in
-`demo/out-beta/review/` before sharing the video.
+when a scene fails; check the log for `teardown:` errors). The chat on screen is live: its lines are blurred (a scene's
+`blur`, boxes in screen points between two marked steps), but look at the contact sheets in `demo/out-beta/review/`
+before sharing the video — a line can move out from under a box.
 
 Remotion is free for individuals, non-profits and companies of up to 3 employees; larger companies need a company
 license (remotion.pro).

@@ -40,6 +40,7 @@ export function buildEdl(script: Script, timeline: Timeline, durations: Duration
     let clip: EdlScene['clip'];
     let zoom: ZoomKey[] = [{ f: 0, scale: 1, cx: 0.5, cy: 0.5 }];
     let term: EdlScene['terminal'];
+    let blur: EdlScene['blur'];
     if (s.show === 'phone' || s.show === 'phone+terminal') {
       const ids = (s.steps ?? []).filter((st) => st.mark).map((st) => `${s.id}.${st.id}`);
       const own = ids.map((id) => {
@@ -80,6 +81,16 @@ export function buildEdl(script: Script, timeline: Timeline, durations: Duration
         if (k.scale > 1 && (!next || next.f > k.f + ZOOM_HOLD) && k.f + ZOOM_HOLD < duration) out.push({ f: k.f + ZOOM_HOLD, scale: 1, cx: 0.5, cy: 0.5 });
       });
       zoom = out;
+      if (s.blur) {
+        const at = (step: string | undefined, or: number) => {
+          if (step === undefined) return or;
+          if (!(s.steps ?? []).some((st) => st.id === step && st.mark)) throw new Error(`scene ${s.id}: blur at ${step} is not a marked step`);
+          return Math.max(0, Math.min(duration, toFrame(marks.get(`${s.id}.${step}`)!.t)));
+        };
+        const { width, height } = timeline.screen;
+        blur = s.blur.map(({ box: [x, y, w, h], from, until }) =>
+          ({ x: x / width, y: y / height, w: w / width, h: h / height, from: at(from, 0), to: at(until, duration) }));
+      }
       if (s.show === 'phone+terminal') {
         term = terminal.filter((c) => c.t >= start && c.t <= end).map((c) => ({ f: toFrame(c.t), text: c.text }));
       }
@@ -87,7 +98,7 @@ export function buildEdl(script: Script, timeline: Timeline, durations: Duration
       duration = Math.round(Math.max(voiceS + 1, 4) * FPS);
     }
     scenes.push({
-      id: s.id, show: s.show, from, duration, card: s.card, clip, zoom,
+      id: s.id, show: s.show, from, duration, card: s.card, clip, zoom, blur,
       captions: captionsOver(s.captions, duration),
       voice: voice ? { src: voice.file, from: VOICE_DELAY } : undefined,
       terminal: term,
