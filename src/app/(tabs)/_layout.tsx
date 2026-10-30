@@ -26,7 +26,7 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}>
       <Tabs.Screen name="index" options={{ title: 'gno.world', tabBarLabel: 'Home', tabBarIcon: icon({ ios: 'house.fill', android: 'home' }) }} />
-      <Tabs.Screen name="pools" options={{ title: 'Pools', tabBarIcon: icon({ ios: 'bubbles.and.sparkles', android: 'bubble_chart' }) }} />
+      {/* Chat before Pools: what most people open */}
       <Tabs.Screen
         name="chat"
         options={{
@@ -35,6 +35,7 @@ export default function TabsLayout() {
           tabBarIcon: icon({ ios: 'bubble.left.and.bubble.right.fill', android: 'forum' }),
         }}
       />
+      <Tabs.Screen name="pools" options={{ title: 'Pools', tabBarIcon: icon({ ios: 'bubbles.and.sparkles', android: 'bubble_chart' }) }} />
       <Tabs.Screen name="session" options={{ title: 'Session', tabBarIcon: icon({ ios: 'key.fill', android: 'key' }) }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: icon({ ios: 'gearshape.fill', android: 'settings' }) }} />
     </Tabs>
