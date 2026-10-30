@@ -30,6 +30,8 @@ const script: Script = {
     { id: 'done', do: { tap: 'Done', timeout: 4000 }, optional: true },
     { id: 'named', do: { waitFor: 'demo' } },
     { id: 'home-tab', do: { tap: /^Home, tab/ } },
+    // back on Home the list sits a little scrolled, the GNOT card's › under the title bar: back to the top
+    { id: 'top', do: { swipe: [200, 300, 200, 700] } },
     { id: 'home', do: { waitFor: 'Open GNOT full screen', timeout: 60_000 } },
     { id: 'here', do: { waitFor: 'Open Here Now full screen', timeout: 60_000 } },
   ],
@@ -44,8 +46,9 @@ const script: Script = {
       voice: "The app now opens on Home: the GNOT price, who is here right now, and the latest chat. Every card opens full screen: the chart, with a crosshair under your finger, and a map of who's around.",
       steps: [
         { id: 'open', do: { waitFor: 'Open GNOT full screen' }, mark: true },
+        { id: 'look', do: { pause: 3500 }, mark: true }, // Home, while the voice names its cards
         { id: 'price', do: { tap: 'Open GNOT full screen' }, mark: true },
-        { id: 'chart', do: { waitFor: '7 days' }, mark: true },
+        { id: 'chart', do: { waitFor: 'market cap' }, mark: true }, // the Home card has the periods too
         // 24 points a second: the chart takes a touch for a crosshair after 200 ms within 8 points
         { id: 'drag', do: { drag: [60, 330, 300, 330], seconds: 10 }, mark: true },
         { id: 'close', do: { tap: 'Close' }, mark: true },
@@ -54,14 +57,14 @@ const script: Script = {
         { id: 'pause', do: { pause: 2500 }, mark: true },
         { id: 'back', do: { tap: 'Close' }, mark: true },
       ],
-      zoomOn: ['chart'],
     },
     {
       id: 'rooms', show: 'phone', captions: ['Channels: Public and your rooms', 'Make a room, share the link'],
       voice: 'Chat has channels now. Public is one tab, and anyone can make a room: give it a name, keep it unlisted, and share the link. The maker gets the tools: invite by name, rename, pin a line, or delete the room.',
       steps: [
-        { id: 'chat', do: { tap: /^Chat, tab/ }, mark: true },
-        { id: 'public', do: { waitFor: /^Public/ }, mark: true },
+        // the clip starts on the channel tabs, zoomed: the Public chat's lines are other people's, live
+        { id: 'chat', do: { tap: /^Chat, tab/ } },
+        { id: 'public', do: { waitFor: 'Public' }, mark: true },
         { id: 'add', do: { tap: 'New room' }, mark: true },
         { id: 'sheet', do: { waitFor: 'Make a room' }, mark: true },
         { id: 'name', do: { type: ROOM, into: 'a name for a new room' }, mark: true },
@@ -81,7 +84,7 @@ const script: Script = {
         // the menu sheet has no close button: a tap above it
         { id: 'menu-close', do: { at: [200, 250] }, mark: true },
       ],
-      zoomOn: ['said', 'tools'],
+      zoomOn: ['public', 'said', 'tools'],
     },
     {
       id: 'session', show: 'phone', captions: ['gnokey-mobile: coming soon', 'A session from your computer, today'],
@@ -91,7 +94,11 @@ const script: Script = {
         { id: 'soon', do: { waitFor: 'COMING SOON' }, mark: true },
         { id: 'ask', do: { tap: 'Get a session from a computer' }, mark: true },
         { id: 'command', do: { waitFor: 'Run this on your computer' }, mark: true },
-        { id: 'read', do: { pause: 2500 }, mark: true },
+        { id: 'read', do: { pause: 2000 }, mark: true },
+        // down to the QR code and "I ran it"
+        { id: 'scroll', do: { swipe: [200, 600, 200, 250] }, mark: true },
+        { id: 'end', do: { waitFor: 'I ran it' }, mark: true },
+        { id: 'look', do: { pause: 2000 }, mark: true },
       ],
       zoomOn: ['soon', 'command'],
     },

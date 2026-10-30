@@ -104,15 +104,16 @@ test('terminal output inside the clip is mapped to scene frames', () => {
 });
 
 test('a zoom lets go after its hold, unless the next one comes first', () => {
-  const s = script([phone('connect', ['a', 'b', 'c'], { zoomOn: ['a', 'c'] })]);
+  // w first: a zoom on the first step opens the scene zoomed (tested below)
+  const s = script([phone('connect', ['w', 'a', 'b', 'c'], { zoomOn: ['a', 'c'] })]);
   const box = { x: 100, y: 700, w: 200, h: 50 };
-  const e = buildEdl(s, timeline([{ id: 'connect.a', t: 10, box }, { id: 'connect.b', t: 11 }, { id: 'connect.c', t: 20, box }]),
+  const e = buildEdl(s, timeline([{ id: 'connect.w', t: 9.5 }, { id: 'connect.a', t: 10, box }, { id: 'connect.b', t: 11 }, { id: 'connect.c', t: 20, box }]),
     { connect: { file: 'v.wav', seconds: 20 } }, []);
   const keys = e.scenes[0].zoom;
   // frame 0, a, a's release, c, c's release
   assert.deepEqual(keys.map((k) => k.scale > 1), [false, true, false, true, false]);
   assert.equal(keys[2].f - keys[1].f, ZOOM_HOLD);
-  const close = buildEdl(s, timeline([{ id: 'connect.a', t: 10, box }, { id: 'connect.b', t: 11 }, { id: 'connect.c', t: 11.5, box }]),
+  const close = buildEdl(s, timeline([{ id: 'connect.w', t: 9.5 }, { id: 'connect.a', t: 10, box }, { id: 'connect.b', t: 11 }, { id: 'connect.c', t: 11.5, box }]),
     { connect: { file: 'v.wav', seconds: 20 } }, []);
   // c comes before a's release: no release in between
   assert.deepEqual(close.scenes[0].zoom.map((k) => k.scale > 1), [false, true, true, false]);
@@ -143,4 +144,14 @@ test('a scene that happens wholly after the last frame holds that frame', () => 
   const c = e.scenes[0].clip!;
   assert.ok(c.start <= c.end && c.end <= 297);
   assert.equal(c.holdFrames + Math.round(((c.end - c.start) / c.rate) * FPS), e.scenes[0].duration);
+});
+
+test('a zoom on the first marked step opens the scene already zoomed: no wide frame before it', () => {
+  const s = script([phone('rooms', ['a', 'b'], { zoomOn: ['a'] })]);
+  const e = buildEdl(s, timeline([{ id: 'rooms.a', t: 10, box: { x: 16, y: 109, w: 63, h: 26 } }, { id: 'rooms.b', t: 20 }]),
+    { rooms: { file: 'v.wav', seconds: 10 } }, []);
+  const [first] = e.scenes[0].zoom;
+  assert.equal(first.f, 0);
+  assert.ok(first.scale > 1);
+  assert.equal(e.scenes[0].zoom.filter((k) => k.f === 0).length, 1);
 });

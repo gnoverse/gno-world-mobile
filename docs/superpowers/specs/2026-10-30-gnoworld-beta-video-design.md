@@ -3,6 +3,12 @@
 **Statut :** conçu le 2026-10-30 ; l'utilisateur a demandé de faire la vidéo dans la foulée, sans autre question.
 Les choix marqués *(choix de Claude)* sont à relire.
 
+**Livré le 2026-10-30** (plan `docs/superpowers/plans/2026-10-30-gnoworld-beta-video.md`) : `DEMO=beta npm run demo`
+rend 79,3 s, `demo:check` vert. Écarts : un nom de chat (« demo ») posé hors caméra (sans nom, le premier message
+ouvre la feuille du nom) ; une ligne « welcome, gno devs! » dans le salon ; la scène des salons s'ouvre zoomée sur les
+onglets pour ne pas montrer les lignes du chat Public (une ligne d'un utilisateur donnait des coordonnées GPS) ; les
+lignes des cartes passent de 32 à 40 px.
+
 Une deuxième vidéo, produite par commande comme la première (`docs/superpowers/specs/2026-10-13-gnoworld-demo-video-design.md`,
 pipeline `demo/`), qui montre aux devs gno **ce qui a changé depuis la démo du 13 octobre** et les **invite à rejoindre la
 bêta** (TestFlight, Google Play internal testing), avec la feuille de route.
