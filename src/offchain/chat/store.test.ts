@@ -583,3 +583,12 @@ test('onPosted is called after a successful send only', async () => {
   await h.store.getState().send('hi');
   expect(onPosted).toHaveBeenCalledTimes(1);
 });
+
+test('a loop stopped before it got going stays stopped', async () => {
+  const h = harness([]);
+  h.store.getState().start();
+  h.store.getState().stop();
+  await flush();
+  expect(h.store.getState().phase).toBe('idle');
+  expect(h.queries).toHaveLength(0);
+});

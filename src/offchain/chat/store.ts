@@ -155,6 +155,7 @@ export function createChatStore(d: ChatDeps): StoreApi<ChatState> & { ready: Pro
 
     const loop = async (signal: AbortSignal, resume: boolean) => {
       await ready;
+      if (signal.aborted) return; // stopped in the same tick it was started
       let first = !resume; // a resume long-polls from the cursor it holds; a new gen still reloads (below)
       let backoff = BACKOFF_MIN;
       let misses = 0; // 404s in a row: a room quiet for a month is gone

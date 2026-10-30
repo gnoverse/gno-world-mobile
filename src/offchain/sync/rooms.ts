@@ -64,6 +64,22 @@ export function mergeBook(local: Book, incoming: { rooms?: unknown; left?: unkno
   return { rooms: capRooms(rooms), left };
 }
 
+/** The site's roomRemember: the room first, `at` now (ms), a known key kept, no longer left. */
+export function rememberRoom(b: Book, e: { id: string; name: string; key?: string }, at: number): Book {
+  const had = b.rooms.find((r) => r.id === e.id);
+  const entry: RoomEntry = {
+    id: e.id, name: (e.name || had?.name || 'private room').slice(0, 40), key: e.key || had?.key || '', at,
+    ...(had?.irc ? { irc: true as const } : {}),
+  };
+  const { [e.id]: _, ...left } = b.left;
+  return { rooms: capRooms([entry, ...b.rooms.filter((r) => r.id !== e.id)]), left };
+}
+
+/** The site's roomForget: the room out, and when it was left (ms), so a paired device leaves it too. */
+export function forgetRoom(b: Book, id: string, at: number): Book {
+  return { rooms: b.rooms.filter((r) => r.id !== id), left: { ...b.left, [id]: at } };
+}
+
 export interface BookStore {
   load(): Promise<Book>;
   save(b: Book): Promise<void>;

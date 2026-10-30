@@ -1,4 +1,4 @@
-import { createBookStore, EMPTY_BOOK, mergeBook, type Book, type RoomEntry } from './rooms';
+import { createBookStore, EMPTY_BOOK, forgetRoom, mergeBook, rememberRoom, type Book, type RoomEntry } from './rooms';
 import { nodeCrypto } from './node-crypto';
 
 const id = (n: number) => `room${String(n).padStart(16, '0')}`; // 20 characters
@@ -95,4 +95,19 @@ test('a save lands in the book of the server it was made for', async () => {
   expect(await b.load()).toEqual(EMPTY_BOOK);
   s.setScope('https://gno.world');
   expect((await b.load()).rooms).toHaveLength(1);
+});
+
+test('rememberRoom puts the room first, now, keeps a known key and takes it out of left', () => {
+  const b = book([room(1), room(2, { key: 'k2' })], { [id(2)]: 1, [id(3)]: 1 });
+  const got = rememberRoom(b, { id: id(2), name: 'renamed' }, 5000);
+  expect(got.rooms[0]).toEqual({ id: id(2), name: 'renamed', key: 'k2', at: 5000 });
+  expect(got.rooms).toHaveLength(2);
+  expect(got.left).toEqual({ [id(3)]: 1 });
+  expect(rememberRoom(b, { id: id(4), name: 'new', key: 'k4' }, 6000).rooms[0]).toEqual({ id: id(4), name: 'new', key: 'k4', at: 6000 });
+});
+
+test('forgetRoom takes the room out and writes when it was left', () => {
+  const got = forgetRoom(book([room(1), room(2)]), id(1), 7000);
+  expect(got.rooms.map((r) => r.id)).toEqual([id(2)]);
+  expect(got.left[id(1)]).toBe(7000);
 });
