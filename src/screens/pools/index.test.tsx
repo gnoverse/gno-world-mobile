@@ -1,8 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { useEffect as mockUseEffect } from 'react';
+import { StyleSheet } from 'react-native';
 
 import { presenceStore } from '@/offchain/presence';
+import { colors } from '@/theme';
 import { PoolsScreen } from '@/screens/pools';
 
 let mockActive: object | null = null;
@@ -34,6 +36,14 @@ test('without a session, New pool is disabled and Go to Session navigates there'
   expect(screen.getByText('A session lets this phone play. Start one to create a pool.')).toBeTruthy();
   await fireEvent.press(screen.getByRole('button', { name: 'Go to Session ›' }));
   expect(router.navigate).toHaveBeenCalledWith('/session');
+});
+
+test('without a session, the way to Session is the button that stands out', async () => {
+  mockActive = null;
+  await render(<PoolsScreen />);
+  const bg = (name: string) => StyleSheet.flatten(screen.getByRole('button', { name }).props.style).backgroundColor;
+  expect(bg('Go to Session ›')).toBe(colors.ring);
+  expect(bg('New pool')).not.toBe(colors.ring);
 });
 
 test('with a session, New pool opens the form and no hint shows', async () => {

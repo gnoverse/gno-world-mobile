@@ -68,6 +68,7 @@ export function ChatFull() {
       <FlatList
         ref={list}
         testID="chat-full-list"
+        style={styles.list}
         inverted
         data={data}
         keyExtractor={(l) => String(l.id)}
@@ -90,6 +91,7 @@ export function ChatFull() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
   here: { color: colors.fg },
+  list: { flex: 1 },
   down: { color: colors.bad, textAlign: 'center', paddingBottom: space.xs },
   foot: { borderTopColor: colors.line, borderTopWidth: 1, paddingTop: space.m, alignItems: 'center' },
   write: { color: colors.accent, fontWeight: '600', paddingHorizontal: space.l },

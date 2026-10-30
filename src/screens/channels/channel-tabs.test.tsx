@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 
 import { ChannelTabs, type Channel } from '@/screens/channels/channel-tabs';
 
@@ -58,4 +59,10 @@ test('the divider renders after separatorAfter', async () => {
   expect(screen.queryByTestId('channel-separator')).toBeNull();
   await view.rerender(<ChannelTabs channels={channels} current="" onSelect={() => undefined} separatorAfter={1} />);
   expect(screen.getByTestId('channel-separator')).toBeTruthy();
+});
+
+test('the row keeps its height above a list that takes the rest', async () => {
+  await render(<ChannelTabs channels={channels} current="" onSelect={() => undefined} />);
+  const row = screen.getByTestId('channel-tabs');
+  expect(StyleSheet.flatten(row.props.style)).toMatchObject({ flexGrow: 0, flexShrink: 0 });
 });

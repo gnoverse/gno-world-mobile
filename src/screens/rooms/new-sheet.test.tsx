@@ -27,7 +27,9 @@ beforeEach(async () => {
 });
 
 test('Make makes the room, selects it in Chat and opens the share sheet', async () => {
-  const share = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction', activityType: undefined });
+  const order: string[] = [];
+  const share = jest.spyOn(Share, 'share').mockImplementation(async () => (order.push('share'), { action: 'sharedAction', activityType: undefined }));
+  jest.mocked(router.back).mockImplementation(() => void order.push('back'));
   let asked: unknown[] = [];
   mockS.client.make = async (...a) => ((asked = a), { id: N, name: 'tea', key: 'k1' });
   await render(<NewRoomSheet />);
@@ -37,8 +39,9 @@ test('Make makes the room, selects it in Chat and opens the share sheet', async 
   expect(asked).toEqual(['tea', true]);
   expect(mockS.chatChannel.getState().current).toBe(N);
   expect(share).toHaveBeenCalledWith({ message: `https://gno.world/#r/${N}` });
-  expect(router.back).toHaveBeenCalled();
+  expect(order).toEqual(['share', 'back']); // over the sheet, before it closes
   share.mockRestore();
+  jest.mocked(router.back).mockReset();
 });
 
 test('a refused Make shows the server\'s words', async () => {

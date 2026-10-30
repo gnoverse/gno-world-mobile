@@ -27,11 +27,14 @@ export function NewRoomSheet() {
     void rooms.getState().refreshListed();
   }, [rooms]);
 
+  const close = () => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/chat');
+  };
   const openInChat = (id: string) => {
     chatChannel.getState().select(id);
     rooms.getState().open(id);
-    if (router.canGoBack()) router.back();
-    else router.replace('/chat');
+    close();
   };
   const run = async (f: () => Promise<{ id: string } | { error: string }>, then?: (id: string) => Promise<unknown>) => {
     setBusy(true);
@@ -39,8 +42,12 @@ export function NewRoomSheet() {
     const r = await f();
     setBusy(false);
     if ('error' in r) return setError(r.error);
-    openInChat(r.id);
-    await then?.(r.id);
+    if (!then) return openInChat(r.id);
+    // over this sheet, before it closes: iOS drops a share sheet asked for while the sheet is going away
+    chatChannel.getState().select(r.id);
+    rooms.getState().open(r.id);
+    await then(r.id).catch(() => undefined);
+    close();
   };
 
   const joined = new Set(book.rooms.map((r) => r.id));
@@ -49,7 +56,8 @@ export function NewRoomSheet() {
     ? all.filter((r) => r.name.toLowerCase().includes(search.trim().toLowerCase()))
     : all;
   return (
-    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+    // the form sheet's header sits over the content: the scroll view insets itself under it
+    <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" contentInsetAdjustmentBehavior="automatic">
       <Text style={styles.h}>Make a room</Text>
       <TextInput
         style={styles.input} value={name} onChangeText={setName} placeholder="a name for a new room" maxLength={120}

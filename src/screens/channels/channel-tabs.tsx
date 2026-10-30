@@ -29,7 +29,7 @@ export function ChannelTabs({ channels, current, onSelect, separatorAfter, onAdd
     if (x !== undefined) scroll.current?.scrollTo({ x: Math.max(0, x - space.l), animated: true });
   }, [current]);
   return (
-    <ScrollView ref={scroll} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.bar}>
+    <ScrollView testID="channel-tabs" ref={scroll} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row} style={styles.bar}>
       {channels.map((c, i) => {
         const on = c.id === current;
         const label = `${c.name}${c.unread ? `, ${c.unread} unread` : ''}`;
@@ -58,7 +58,8 @@ export function ChannelTabs({ channels, current, onSelect, separatorAfter, onAdd
 }
 
 const styles = StyleSheet.create({
-  bar: { flexGrow: 0 },
+  // a list under it takes the rest of the column; the row never shrinks
+  bar: { flexGrow: 0, flexShrink: 0 },
   row: { gap: space.s, alignItems: 'center', paddingHorizontal: space.l, paddingVertical: space.xs },
   pill: {
     flexDirection: 'row', alignItems: 'center', gap: space.xs, maxWidth: 110,

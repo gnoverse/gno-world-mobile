@@ -76,12 +76,12 @@ export function PoolsScreen() {
             <Text style={styles.warn}>{NOPLAY_TEXT}</Text>
           ) : (
             <>
-              <Button title="New pool" disabled={!active} onPress={() => router.push('/create')} />
+              <Button title="New pool" kind={active ? 'primary' : 'secondary'} disabled={!active} onPress={() => router.push('/create')} />
               {/* the form would only say so at its bottom: say it here, with the way there */}
               {active ? null : (
                 <>
                   <Text style={[styles.muted, styles.center]}>A session lets this phone play. Start one to create a pool.</Text>
-                  <Button kind="secondary" title="Go to Session ›" onPress={() => router.navigate('/session')} />
+                  <Button title="Go to Session ›" onPress={() => router.navigate('/session')} />
                 </>
               )}
             </>
