@@ -45,8 +45,11 @@ export interface RoomsState {
   /** the maker's key the book holds for a room; '' none */
   keyOf(id: string): string;
   unreadOf(id: string): number;
+  /** a screen shows this room: it long-polls (the previous room stops); pairs with blur */
   focus(id: string): void;
+  /** that screen lets go; the room stops once no screen shows it */
   blur(id: string): void;
+  /** the room is picked: its invitation and unread count go (the screen showing it focuses it) */
   open(id: string): void;
   join(text: string): Promise<{ id: string } | { error: string }>;
   make(name: string, listed: boolean): Promise<{ id: string } | { error: string }>;
@@ -112,6 +115,8 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
   // insertion order is recency: the first is the least recently opened
   const stores = new Map<string, { store: ChatStore; unsub: () => void }>();
   const seenInvites = new Set<string>();
+  // screens showing each room (focus/blur pairs): a screen mounting over another claims before the other lets go
+  const claims = new Map<string, number>();
   let active = false;
   let timer: ReturnType<typeof setInterval> | null = null;
   let lastPoke = -Infinity;
@@ -181,6 +186,14 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
       return store;
     };
 
+    /** the room goes off screen: its loop stops, and what was read there stays read (the scan's count was older) */
+    const leave = (id: string) => {
+      const s = stores.get(id)?.store.getState();
+      if (!s) return;
+      s.stop();
+      set((st) => ({ unread: { ...st.unread, [id]: unreadCount(s, s.lastSeen, s.mine) } }));
+    };
+
     const tick = () => {
       lastPoke = now();
       void get().refreshListed();
@@ -198,18 +211,22 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
         return id === get().focused && s ? unreadCount(s, s.lastSeen, s.mine) : get().unread[id] ?? 0;
       },
       focus: (id) => {
+        claims.set(id, (claims.get(id) ?? 0) + 1);
         const was = get().focused;
-        if (was && was !== id) stores.get(was)?.store.getState().stop();
+        if (was && was !== id) leave(was);
         set({ focused: id });
         if (id && active) room(id).getState().start();
       },
       blur: (id) => {
-        if (!id || get().focused !== id) return;
-        stores.get(id)?.store.getState().stop();
+        const n = (claims.get(id) ?? 0) - 1;
+        if (n > 0) claims.set(id, n);
+        else claims.delete(id);
+        // another screen still shows it (a full screen opened over the card): it keeps polling
+        if (!id || n > 0 || get().focused !== id) return;
+        leave(id);
         set({ focused: '' });
       },
       open: (id) => {
-        get().focus(id);
         set((s) => {
           const { [id]: _i, ...invited } = s.invited;
           return { invited, unread: { ...s.unread, [id]: 0 }, banner: s.banner?.id === id ? null : s.banner };
@@ -367,6 +384,7 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
         epoch++;
         for (const id of [...stores.keys()]) drop(id);
         seenInvites.clear();
+        claims.clear();
         lastPoke = -Infinity;
         writing = Promise.resolve();
         set({ ...INITIAL });

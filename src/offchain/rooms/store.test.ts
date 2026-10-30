@@ -220,13 +220,43 @@ test('an invitation to a room left since is not taken back', async () => {
   expect(g.rooms.getState().banner).toBeNull();
 });
 
-test('open focuses the room and clears its invitation and unread count', async () => {
+test('open clears the room\'s invitation and unread count, and leaves the long-poll to the screens', async () => {
   const h = harness();
   h.rooms.setState({ invited: { [id(1)]: 'bob' }, unread: { [id(1)]: 4 } });
   h.rooms.getState().open(id(1));
-  expect(h.rooms.getState().focused).toBe(id(1));
+  expect(h.rooms.getState().focused).toBe('');
   expect(h.rooms.getState().invited).toEqual({});
   expect(h.rooms.getState().unreadOf(id(1))).toBe(0);
+});
+
+test('a second screen claiming the room keeps it polling when the first lets go', async () => {
+  const h = harness();
+  h.rooms.getState().resume();
+  // the full screen mounts and claims before the card under it loses the focus
+  h.rooms.getState().focus(id(1));
+  h.rooms.getState().focus(id(1));
+  h.rooms.getState().blur(id(1));
+  await flush();
+  expect(h.rooms.getState().focused).toBe(id(1));
+  expect(phase(h, id(1))).toBe('loading');
+  h.rooms.getState().blur(id(1));
+  expect(phase(h, id(1))).toBe('idle');
+  expect(h.rooms.getState().focused).toBe('');
+});
+
+test('leaving a room keeps what was read: its count is the live one, not the scan\'s from before', async () => {
+  const h = harness();
+  h.rooms.getState().resume();
+  h.rooms.setState({ unread: { [id(1)]: 5 } });
+  h.rooms.getState().focus(id(1));
+  const s = h.rooms.getState().room(id(1));
+  s.setState({ lines: [line(1), line(2)], lastSeen: 2 });
+  h.rooms.getState().focus(id(2));
+  expect(h.rooms.getState().unreadOf(id(1))).toBe(0);
+  h.rooms.setState({ unread: { [id(2)]: 3 } });
+  h.rooms.getState().room(id(2)).setState({ lines: [line(7)], lastSeen: 7 });
+  h.rooms.getState().blur(id(2));
+  expect(h.rooms.getState().unreadOf(id(2))).toBe(0);
 });
 
 test('scanAll counts lines past the mark that are not mine, skips the focused room, marks 404 rooms gone without forgetting', async () => {
