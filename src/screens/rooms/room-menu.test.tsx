@@ -104,3 +104,24 @@ test('Listed publicly shows the room\'s state and flips it', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Listed publicly' }));
   expect(set).toEqual({ listed: false });
 });
+
+test('Listed publicly says nothing of another room until the server answers for it, and does not flip meanwhile', async () => {
+  const K = 'KKKKKKKKKKKKKKKKKKKK';
+  mockS.rooms.setState({ book: { rooms: [{ id: K, name: 'other', key: 'k2', at: 3 }, ...mockS.rooms.getState().book.rooms], left: {} } });
+  let set: unknown;
+  mockS.client.setRoom = async (_id, _k, p) => ((set = p), {});
+  const view = await render(<RoomMenu id={M} visible onClose={noop} onLeft={noop} />);
+  expect(await screen.findByText('on')).toBeTruthy();
+  mockS.client.info = () => new Promise(() => undefined); // K's answer never comes
+  await view.rerender(<RoomMenu id={K} visible onClose={noop} onLeft={noop} />);
+  expect(screen.queryByText('on')).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Listed publicly' }));
+  expect(set).toBeUndefined();
+});
+
+test('a listed room not joined: Share link and Pair with a browser only (nothing to rename or leave)', async () => {
+  const L = 'LLLLLLLLLLLLLLLLLLLL';
+  mockS.rooms.setState({ listed: [{ id: L, name: 'governance', here: 4, made: 1 }] });
+  await render(<RoomMenu id={L} visible onClose={noop} onLeft={noop} />);
+  expect(labels()).toEqual(['Share link', 'Pair with a browser']);
+});

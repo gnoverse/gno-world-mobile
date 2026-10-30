@@ -44,3 +44,15 @@ test('current channel saved per server', async () => {
   await two.getState().reload();
   expect(two.getState().current).toBe('');
 });
+
+test('a channel picked while the saved one is still being read stays picked', async () => {
+  let answer: (v: string | null) => void = () => undefined;
+  const store = createChatChannel({
+    kv: { getItem: () => new Promise((r) => (answer = r)), setItem: async () => undefined },
+    scope: () => 'S',
+  });
+  store.getState().select(B);
+  answer(A);
+  await store.ready;
+  expect(store.getState().current).toBe(B);
+});

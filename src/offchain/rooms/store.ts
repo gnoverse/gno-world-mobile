@@ -16,6 +16,7 @@ export const NO_ANSWER = 'the box did not answer about that room — try again i
 /** the site's words for a room that is not there (GET /api/room 404) */
 export const NO_SUCH_ROOM = 'no such room — the link may be wrong, or the room was quiet for a month and is gone';
 const NOT_THE_MAKER = 'only the room\'s maker can do that';
+export const NOT_JOINED = 'that room is not in your list — a line written there joins it';
 /** room stores kept in memory besides Public */
 export const MAX_STORES = 8;
 export const SCAN_EVERY = 120_000;
@@ -24,6 +25,8 @@ const INVITE_FRESH = 3_600_000;
 
 export interface RoomsState {
   book: Book;
+  /** the book of this server has been read */
+  bookRead: boolean;
   /** the rooms listed on the server; null until read on this server */
   listed: ListedRoom[] | null;
   /** the last listing failed (the previous one is kept) */
@@ -41,12 +44,14 @@ export interface RoomsState {
   gone: Record<string, true>;
   /** the room long-polling beside Public; '' none */
   focused: string;
-  /** a room's store ('' is Public's), made on demand */
+  /** room stores dropped so far: a screen holding one asks room() again when this changes */
+  dropped: number;
+  /** a room's store ('' is Public's), made on demand; never drops one (screens call it while rendering) */
   room(id: string): ChatStore;
   /** the maker's key the book holds for a room; '' none */
   keyOf(id: string): string;
   unreadOf(id: string): number;
-  /** a screen shows this room: it long-polls (the previous room stops); pairs with blur */
+  /** a screen shows this room: it long-polls (the previous room stops), and stores past 8 go; pairs with blur */
   focus(id: string): void;
   /** that screen lets go; the room stops once no screen shows it */
   blur(id: string): void;
@@ -106,7 +111,7 @@ const parseMark = (raw: string | null) => {
 };
 
 const INITIAL = {
-  book: EMPTY_BOOK, listed: null, listedError: false, unread: {}, invited: {}, banner: null, goneSaid: null, gone: {}, focused: '',
+  book: EMPTY_BOOK, bookRead: false, listed: null, listedError: false, unread: {}, invited: {}, banner: null, goneSaid: null, gone: {}, focused: '', dropped: 0,
 };
 
 export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
@@ -123,6 +128,10 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
   let lastPoke = -Infinity;
   // bumped by restart(): an answer to a request made before is about another server
   let epoch = 0;
+  // rooms made here whose book write failed: kept in memory, and written with the book's next change
+  const unsaved = new Map<string, { id: string; name: string; key: string }>();
+  const withUnsaved = (b: Book) =>
+    [...unsaved.values()].reduce((acc, r) => (acc.rooms.some((x) => x.id === r.id) ? acc : rememberRoom(acc, r, now())), b);
 
   return createStore<RoomsState>()((set, get) => {
     const drop = (id: string) => {
@@ -131,20 +140,29 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
       s.unsub();
       s.store.getState().stop();
       stores.delete(id);
-      if (get().focused === id) set({ focused: '' });
+      set((st) => ({ dropped: st.dropped + 1, focused: st.focused === id ? '' : st.focused }));
     };
 
-    /** the book's own update: a /pair pull changing it meanwhile is merged, not overwritten */
+    /** the book's own update: a /pair pull changing it meanwhile is merged, not overwritten; nothing changed, no push */
     const changeBook = (f: (b: Book) => Book) => {
       const e = epoch;
-      return d.book.update(f).then((b) => {
-        if (e !== epoch) return;
+      const keep = [...unsaved.keys()];
+      let changed = false;
+      return d.book.update((b0) => {
+        const b = withUnsaved(b0);
+        const b1 = f(b);
+        changed = b1 !== b0;
+        return b1;
+      }).then((b) => {
+        for (const id of keep) unsaved.delete(id);
+        if (e !== epoch || !changed) return;
         set({ book: b });
         d.syncChanged();
       });
     };
     const remember = (r: { id: string; name: string; key?: string }) => changeBook((b) => rememberRoom(b, r, now()));
     const forget = (id: string) => changeBook((b) => forgetRoom(b, id, now()));
+    const joined = (id: string) => get().book.rooms.some((r) => r.id === id);
 
     const nameOf = (id: string) =>
       get().book.rooms.find((r) => r.id === id)?.name || get().listed?.find((r) => r.id === id)?.name
@@ -173,11 +191,15 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
         if (s.gone && !before.gone) onGone(id);
       });
       stores.set(id, { store, unsub });
-      for (const old of stores.keys()) {
-        if (stores.size <= MAX_STORES) break;
-        if (old !== get().focused && old !== id) drop(old);
-      }
       return store;
+    };
+
+    /** past 8 stores, the least recently opened go: never the focused one */
+    const evict = () => {
+      for (const old of [...stores.keys()]) {
+        if (stores.size <= MAX_STORES) break;
+        if (old !== get().focused) drop(old);
+      }
     };
 
     /** the room goes off screen: its loop stops, and what was read there stays read (the scan's count was older) */
@@ -209,7 +231,10 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
         const was = get().focused;
         if (was && was !== id) leave(was);
         set({ focused: id });
-        if (id && active) room(id).getState().start();
+        if (!id) return;
+        const store = room(id);
+        evict();
+        if (active) store.getState().start();
       },
       blur: (id) => {
         const n = (claims.get(id) ?? 0) - 1;
@@ -237,7 +262,8 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
             await forget(id);
             return { error: NO_SUCH_ROOM };
           }
-          await remember({ id, name: info.name });
+          // joined already: the book stays as it is (its order is the browser's)
+          await changeBook((b) => (b.rooms.some((r) => r.id === id) ? b : rememberRoom(b, { id, name: info.name }, now())));
           return { id };
         } catch {
           return { error: NO_ANSWER };
@@ -248,7 +274,11 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
         try {
           const r = await d.client.make(name, listed);
           if (e !== epoch) return { error: NO_ANSWER };
-          await remember(r);
+          await remember(r).catch(() => {
+            // the room is made: its key stays here, and goes into the book with its next change
+            unsaved.set(r.id, r);
+            set((s) => ({ book: rememberRoom(s.book, r, now()) }));
+          });
           return { id: r.id };
         } catch (err) {
           return fail(err);
@@ -256,11 +286,12 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
       },
       leave: async (id) => {
         drop(id);
-        await forget(id);
+        if (joined(id)) await forget(id);
       },
       rename: async (id, name) => {
         const key = get().keyOf(id);
         if (!key) {
+          if (!joined(id)) return NOT_JOINED;
           await remember({ id, name });
           return `renamed to "${name}" for you (the room's maker or the owner renames it for everyone)`;
         }
@@ -383,17 +414,18 @@ export function createRoomsStore(d: RoomsDeps): StoreApi<RoomsState> {
         get().pause();
         epoch++;
         for (const id of [...stores.keys()]) drop(id);
+        unsaved.clear();
         seenInvites.clear();
         claims.clear();
         lastPoke = -Infinity;
-        set({ ...INITIAL });
+        set({ ...INITIAL, dropped: get().dropped }); // only ever counts up: screens compare it
         if (wasActive) get().resume();
       },
       reloadBook: async () => {
         const e = epoch;
         const book = await d.book.load().catch(() => null);
         if (!book || e !== epoch) return;
-        set({ book });
+        set({ book: withUnsaved(book), bookRead: true });
         // left on a paired device: its store closes here too
         for (const id of [...stores.keys()]) if (book.left[id] && !book.rooms.some((r) => r.id === id)) drop(id);
       },

@@ -5,7 +5,7 @@ import { line, reply } from '@/offchain/chat/testing';
 import type { ChatPollReply } from '@/offchain/chat/types';
 import { OffchainError } from '@/offchain/http';
 import type { ListedRoom, RoomsClient } from '@/offchain/rooms/client';
-import { createRoomsStore, NOT_A_LINK, NO_ANSWER } from '@/offchain/rooms/store';
+import { createRoomsStore, NOT_A_LINK, NOT_JOINED, NO_ANSWER } from '@/offchain/rooms/store';
 import { EMPTY_BOOK, type Book, type BookStore } from '@/offchain/sync/rooms';
 
 const id = (n: number) => `room${String(n).padStart(16, '0')}`; // 20 characters
@@ -63,7 +63,7 @@ function harness(o: { book?: Book; listed?: ListedRoom[] } = {}) {
     clearInterval: ((n: number) => void (timers[n - 1] = () => undefined)) as unknown as typeof clearInterval,
   });
   return {
-    rooms, client, book: () => held, kv, polls, answers, made, syncChanged, timers, publicStore,
+    rooms, client, book: () => held, bookStore: book, kv, polls, answers, made, syncChanged, timers, publicStore,
     tick: (ms: number) => (clock += ms), now: () => clock,
   };
 }
@@ -102,16 +102,17 @@ test('while paused, focus waits for resume', async () => {
   expect(phase(h, id(1))).toBe('idle');
 });
 
-test('at most 8 room stores: the least recently opened is stopped and dropped, never the focused one', async () => {
+test('room() alone never drops a store (screens call it while rendering); a focus keeps 8, never the focused one, and counts the drop', async () => {
   const h = harness();
   h.rooms.getState().resume();
   h.rooms.getState().focus(id(0));
   const first = h.rooms.getState().room(id(0));
   for (let n = 1; n <= 8; n++) h.rooms.getState().room(id(n));
-  expect(h.rooms.getState().room(id(0))).toBe(first); // focused: kept
+  expect(h.rooms.getState().dropped).toBe(0);
+  h.rooms.getState().focus(id(1)); // nine stores: the least recently opened one goes
+  expect(h.rooms.getState().dropped).toBe(1);
+  expect(h.rooms.getState().room(id(0))).not.toBe(first);
   expect(h.made.filter((m) => m === id(1))).toHaveLength(1);
-  h.rooms.getState().room(id(1)); // the oldest unfocused one was dropped: made anew
-  expect(h.made.filter((m) => m === id(1))).toHaveLength(2);
 });
 
 test('join: a link is remembered and returned', async () => {
@@ -399,4 +400,47 @@ test('a later scan that reaches the room takes its gone mark away', async () => 
   h.client.scan.mockResolvedValueOnce(reply({ msgs: [], next: 3 }));
   await h.rooms.getState().scanAll();
   expect(h.rooms.getState().gone[id(1)]).toBeUndefined();
+});
+
+test('join of a room already in the book leaves the book as it is: no reorder, no /pair push', async () => {
+  const h = harness({ book: { rooms: [entry(2), entry(1)], left: {} } });
+  await h.rooms.getState().reloadBook();
+  h.client.info.mockResolvedValueOnce({ id: id(1), name: 'r1', listed: false, here: 1, made: 1 });
+  expect(await h.rooms.getState().join(id(1))).toEqual({ id: id(1) });
+  expect(h.book().rooms.map((r) => r.id)).toEqual([id(2), id(1)]);
+  expect(h.syncChanged).not.toHaveBeenCalled();
+});
+
+test('leave and rename on a room not in the book write nothing there', async () => {
+  const h = harness({ book: { rooms: [entry(1)], left: {} } });
+  await h.rooms.getState().reloadBook();
+  await h.rooms.getState().leave(id(5));
+  expect(h.book()).toEqual({ rooms: [entry(1)], left: {} });
+  expect(await h.rooms.getState().rename(id(5), 'mine')).toBe(NOT_JOINED);
+  expect(h.book()).toEqual({ rooms: [entry(1)], left: {} });
+  expect(h.syncChanged).not.toHaveBeenCalled();
+});
+
+test('make keeps the new room and its key when the book cannot be written, and writes it with the next change', async () => {
+  const h = harness();
+  const fail = jest.spyOn(h.bookStore, 'update').mockRejectedValueOnce(new Error('disk full'));
+  h.client.make.mockResolvedValueOnce({ id: id(1), name: 'gnomes', key: 'k1' });
+  expect(await h.rooms.getState().make('gnomes', false)).toEqual({ id: id(1) });
+  expect(h.rooms.getState().keyOf(id(1))).toBe('k1');
+  expect(h.rooms.getState().book.rooms.map((r) => r.id)).toEqual([id(1)]);
+  fail.mockRestore();
+  h.client.info.mockResolvedValueOnce({ id: id(2), name: 'other', listed: false, here: 1, made: 1 });
+  await h.rooms.getState().join(id(2));
+  expect(h.book().rooms.find((r) => r.id === id(1))?.key).toBe('k1');
+  await h.rooms.getState().reloadBook();
+  expect(h.rooms.getState().keyOf(id(1))).toBe('k1');
+});
+
+test('bookRead: false until this server\'s book is read, false again after a restart', async () => {
+  const h = harness({ book: { rooms: [entry(1)], left: {} } });
+  expect(h.rooms.getState().bookRead).toBe(false);
+  await h.rooms.getState().reloadBook();
+  expect(h.rooms.getState().bookRead).toBe(true);
+  h.rooms.getState().restart();
+  expect(h.rooms.getState().bookRead).toBe(false);
 });

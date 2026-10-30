@@ -23,10 +23,14 @@ export function ChatScreen() {
   const current = useChatChannel((s) => s.current);
   const book = useRooms((s) => s.book);
   const listed = useRooms((s) => s.listed);
+  const listedError = useRooms((s) => s.listedError);
+  const bookRead = useRooms((s) => s.bookRead);
   const banner = useRooms((s) => s.banner);
   const goneSaid = useRooms((s) => s.goneSaid);
   // the row reads the scans' counts: recomputed whenever the registry changes
   useRooms((s) => s.unread);
+  // a store dropped meanwhile is made again
+  useRooms((s) => s.dropped);
   const store = rooms.getState().room(current);
   const here = useStore(store, (s) => s.here);
   const me = useStore(identity, (s) => s.identity);
@@ -50,19 +54,23 @@ export function ChatScreen() {
   useEffect(() => {
     if (askIdentity === '1') router.setParams({ identity: undefined });
   }, [askIdentity]);
+  // the param waits for the book and the listing (a cold start reads them after the link came): a room joined or listed
+  // is picked as it is, only another one is joined; a listing that fails does not hold the link back
+  const known = bookRead && (listed !== null || listedError);
   useEffect(() => {
-    if (askRoom === undefined) return;
+    const wanted = askRoom;
+    if (wanted === undefined || (wanted && !known)) return;
     router.setParams({ room: undefined });
     const s = rooms.getState();
-    if (!askRoom || s.book.rooms.some((r) => r.id === askRoom) || s.listed?.some((r) => r.id === askRoom)) {
-      chatChannel.getState().select(askRoom);
+    if (!wanted || s.book.rooms.some((r) => r.id === wanted) || s.listed?.some((r) => r.id === wanted)) {
+      chatChannel.getState().select(wanted);
       return;
     }
-    void s.join(askRoom).then((r) => {
+    void s.join(wanted).then((r) => {
       if ('id' in r) chatChannel.getState().select(r.id);
       else setNotice(r.error);
     });
-  }, [askRoom, rooms, chatChannel]);
+  }, [askRoom, known, rooms, chatChannel]);
 
   // a channel left, gone (its store forgets it), or no longer listed: back to Public (once the listing says so, not
   // while it loads)

@@ -18,6 +18,8 @@ export function useHomeTabs() {
   const current = useHomeChannels((s) => s.current);
   const book = useRooms((s) => s.book);
   const listed = useRooms((s) => s.listed);
+  // a store dropped meanwhile (more rooms opened elsewhere than kept) is made again
+  useRooms((s) => s.dropped);
   // a stable selector input: the store of the current channel
   const store = rooms.getState().room(current);
   const roomGone = useStore(store, (s) => s.gone);

@@ -33,7 +33,7 @@ export function screenServices(o: { book?: Book; listed?: ListedRoom[] | null; c
     syncChanged: () => undefined,
     makeRoomStore: (room, onPosted) => createChatStore({ client: chatClient, identity: () => NO_IDENTITY, kv: kvs, scope, room, onPosted }),
   });
-  rooms.setState({ book: held, listed: o.listed === undefined ? [] : o.listed });
+  rooms.setState({ book: held, bookRead: true, listed: o.listed === undefined ? [] : o.listed });
   const homeChannels = createHomeChannels({ kv: kvs, scope });
   const chatChannel = createChatChannel({ kv: kvs, scope });
   return {

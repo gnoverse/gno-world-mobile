@@ -21,18 +21,21 @@ export function RoomMenu({ id, visible, onClose, onLeft }: { id: string; visible
   const { rooms } = useServices();
   const offchainUrl = useSettings((s) => s.offchainUrl);
   const key = useRooms((s) => s.book.rooms.find((r) => r.id === id)?.key ?? '');
+  const joined = useRooms((s) => s.book.rooms.some((r) => r.id === id));
   const name = useRooms((s) => s.book.rooms.find((r) => r.id === id)?.name || s.listed?.find((r) => r.id === id)?.name || 'this room');
-  const [listed, setListed] = useState<boolean | null>(null);
+  // kept with the room it is about: another room's says nothing here
+  const [listedOf, setListedOf] = useState<{ id: string; on: boolean } | null>(null);
+  const listed = listedOf?.id === id ? listedOf.on : null;
   const [mode, setMode] = useState<Mode>('menu');
   const [newName, setNewName] = useState('');
   const [said, setSaid] = useState('');
   const [busy, setBusy] = useState(false);
-  // whether it is listed is the server's to say
+  // whether it is listed is the server's to say, for this room: nothing until it answers
   useEffect(() => {
     if (!visible || !key) return;
     let on = true;
     void rooms.getState().roomInfo(id).then((r) => {
-      if (on && r && r !== 'gone') setListed(r.listed);
+      if (on && r && r !== 'gone') setListedOf({ id, on: r.listed });
     });
     return () => {
       on = false;
@@ -55,16 +58,19 @@ export function RoomMenu({ id, visible, onClose, onLeft }: { id: string; visible
       onPress: () => void Share.share({ message: roomLink(offchainUrl, id) }).catch(() => undefined).then(close),
     });
     if (key) items.push({ label: 'Invite…', stay: true, onPress: () => setMode('invite') });
-    items.push({ label: 'Rename', stay: true, onPress: () => (setNewName(name), setMode('rename')) });
+    // a listed room read but not joined has no label of its own, and nothing to leave
+    if (joined) items.push({ label: 'Rename', stay: true, onPress: () => (setNewName(name), setMode('rename')) });
     if (key) {
       items.push({
         label: 'Listed publicly', detail: listed === null ? undefined : listed ? 'on' : 'off', stay: true,
-        onPress: () =>
-          void rooms.getState().setListed(id, !listed).then((err) => (err ? say(err) : setListed(!listed))),
+        onPress: () => {
+          if (listed === null) return;
+          void rooms.getState().setListed(id, !listed).then((err) => (err ? say(err) : setListedOf({ id, on: !listed })));
+        },
       });
       items.push({ label: 'Delete room', danger: true, stay: true, onPress: () => setMode('delete') });
     }
-    items.push({ label: 'Leave', onPress: () => void rooms.getState().leave(id).then(onLeft) });
+    if (joined) items.push({ label: 'Leave', onPress: () => void rooms.getState().leave(id).then(onLeft) });
   }
   items.push({ label: 'Pair with a browser', onPress: () => router.push('/pair') });
 

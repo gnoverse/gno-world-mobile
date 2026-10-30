@@ -37,6 +37,7 @@ export function createChatChannel(d: { kv: KV; scope: () => string }): StoreApi<
   const store = createStore<ChatChannelState>()((set) => ({
     current: '',
     select: (id) => {
+      epoch++; // picked now: a saved channel still being read does not replace it
       set({ current: id });
       void d.kv.setItem(key(), id).catch(() => undefined);
     },

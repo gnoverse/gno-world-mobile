@@ -267,4 +267,20 @@ describe('ChatCard', () => {
     await act(() => mockS.rooms.getState().room(ROOM).setState({ gone: true }));
     expect(screen.getAllByRole('tab')).toHaveLength(1);
   });
+
+  // Home off screen while Chat goes through more rooms than the registry keeps: the card's store is dropped
+  test('a card whose room store was dropped meanwhile shows the new store\'s lines', async () => {
+    mockS.homeChannels.getState().add({ id: ROOM, name: 'Dev chat' });
+    const old = mockS.rooms.getState().room(ROOM);
+    await render(<ChatCard />);
+    await act(() => {
+      const r = mockS.rooms.getState();
+      r.blur(ROOM); // Home loses the focus
+      for (let n = 0; n < 9; n++) r.focus(`other${String(n).padStart(15, '0')}`);
+      r.focus(ROOM); // and has it again
+    });
+    expect(mockS.rooms.getState().room(ROOM)).not.toBe(old);
+    await act(() => mockS.rooms.getState().room(ROOM).setState({ phase: 'live', lines: [line(3, { name: 'kim', body: 'still here' })] }));
+    expect(screen.getByText('still here')).toBeTruthy();
+  });
 });

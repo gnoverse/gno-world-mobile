@@ -185,3 +185,35 @@ test('a room one scan found gone can still be opened: its own poll decides', asy
   await fireEvent.press(screen.getByRole('tab', { name: 'Dev chat' }));
   expect(mockS.chatChannel.getState().current).toBe(A);
 });
+
+test('a room param waits for the book and the listing: a room joined already is not joined again', async () => {
+  const info = jest.fn(async () => ({ id: A, name: 'Dev chat', listed: false, here: 1, made: 1 }));
+  mockS.client.info = info;
+  const book = mockS.rooms.getState().book;
+  mockS.rooms.setState({ book: { rooms: [], left: {} }, bookRead: false, listed: null });
+  mockParams.room = A;
+  await render(<ChatScreen />);
+  await act(async () => undefined); // the Chat tab's poke brings the listing in: the book is still not read
+  expect(info).not.toHaveBeenCalled();
+  await act(() => mockS.rooms.setState({ book, bookRead: true }));
+  expect(mockS.chatChannel.getState().current).toBe(A);
+  expect(info).not.toHaveBeenCalled();
+});
+
+test('a listed room asked for before the listing came is read, not joined', async () => {
+  mockS.rooms.setState({ listed: null });
+  mockParams.room = L;
+  await render(<ChatScreen />);
+  await act(() => mockS.rooms.setState({ listed: [{ id: L, name: 'governance', here: 4, made: 1 }] }));
+  expect(mockS.chatChannel.getState().current).toBe(L);
+  expect(mockS.book().rooms.map((r) => r.id)).toEqual([A]);
+});
+
+test('with the listing failing, a room param not joined is joined', async () => {
+  mockS.client.info = async () => ({ id: X, name: 'party', listed: false, here: 1, made: 1 });
+  mockS.rooms.setState({ listed: null, listedError: true });
+  mockParams.room = X;
+  await render(<ChatScreen />);
+  await act(async () => undefined);
+  expect(mockS.chatChannel.getState().current).toBe(X);
+});
