@@ -126,6 +126,14 @@ describe('HereCard', () => {
     expect(screen.getByText('2')).toBeTruthy();
   });
 
+  test('a row without a country has a "?" badge in place of a flag, not a dot', async () => {
+    // 18 here: 4 by country, 2 elsewhere, 12 unknown
+    await render(<HereCard data={WHERE} failed={false} />);
+    // hidden from screen readers: the row's name says it
+    expect(screen.getAllByTestId('no-flag', { includeHiddenElements: true })).toHaveLength(2);
+    expect(screen.queryByText('·', { includeHiddenElements: true })).toBeNull();
+  });
+
   test('countries unavailable: one unknown row with the total', async () => {
     await render(<HereCard data={{ ...WHERE, byCountry: [], elsewhere: 0, geo: false, spots: [] }} failed={false} />);
     expect(screen.getByText('18 people · countries unavailable on this build')).toBeTruthy();
