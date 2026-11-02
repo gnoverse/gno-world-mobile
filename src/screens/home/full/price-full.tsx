@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StyleSheet, Text, View } from 'react-native';
 
 import { DemoBadge } from '@/demo-mode/ui/badge';
 import { fetchPrices, PRICES_EVERY_MS, type PriceDays, type Prices } from '@/offchain/home';
@@ -84,8 +84,9 @@ export function PriceFull({ initialDays }: { initialDays: PriceDays }) {
         </View>
       )}
       {prices.failed && <Text style={[styles.small, styles.note]}>{PRICES_BUSY}</Text>}
-      {/* a full-screen modal hides the root's DEMO badge (app/_layout): its own, at the same place */}
-      <DemoBadge />
+      {/* on iOS a full-screen modal hides the root's DEMO badge (app/_layout): its own, at the same place; Android
+          draws the root's over the modal, so a second one would double it */}
+      {Platform.OS === 'ios' ? <DemoBadge /> : null}
     </View>
   );
 }

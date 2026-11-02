@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useEffect as mockUseEffect } from 'react';
 
@@ -209,14 +209,29 @@ test('while another period loads, the figures keep the period they describe', as
   expect(screen.queryByText('30d high')).toBeNull();
 });
 
-test("in demo mode, the DEMO badge shows over this full-screen modal, which hides the root's", async () => {
+test("in demo mode on iOS, the DEMO badge shows over this full-screen modal, which hides the root's", async () => {
   const { demoStore } = jest.requireActual<typeof import('@/demo-mode/store')>('@/demo-mode/store');
-  await render(<PriceFull initialDays={1} />);
-  expect(screen.queryByTestId('demo-badge')).toBeNull();
-  await act(() => demoStore.getState().enter());
+  const os = jest.replaceProperty(Platform, 'OS', 'ios');
   try {
+    await render(<PriceFull initialDays={1} />);
+    expect(screen.queryByTestId('demo-badge')).toBeNull();
+    await act(() => demoStore.getState().enter());
     expect(screen.getByLabelText('Demo mode — tap to leave')).toBeTruthy();
   } finally {
     await act(() => demoStore.getState().leave());
+    os.restore();
+  }
+});
+
+test("in demo mode on Android, the root's badge shows through: the card draws none of its own", async () => {
+  const { demoStore } = jest.requireActual<typeof import('@/demo-mode/store')>('@/demo-mode/store');
+  const os = jest.replaceProperty(Platform, 'OS', 'android');
+  try {
+    await render(<PriceFull initialDays={1} />);
+    await act(() => demoStore.getState().enter());
+    expect(screen.queryByLabelText('Demo mode — tap to leave')).toBeNull();
+  } finally {
+    await act(() => demoStore.getState().leave());
+    os.restore();
   }
 });
