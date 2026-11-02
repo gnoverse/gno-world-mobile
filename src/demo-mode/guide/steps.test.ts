@@ -23,3 +23,9 @@ test('every waitFor is a GuideEvent the screens emit', () => {
 test("the store's awaited events are the steps'", () => {
   expect(GUIDE_WAITS).toEqual(STEPS.map((s) => s.waitFor ?? null));
 });
+
+test("the pool's steps lead in through the guided pool", () => {
+  expect(STEPS.filter((s) => s.via).map((s) => [s.title, s.via])).toEqual([
+    ['Boop', 'pools.guided'], ['Skip the wait', 'pools.guided'], ['You won', 'pools.guided'],
+  ]);
+});

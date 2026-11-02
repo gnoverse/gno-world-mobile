@@ -12,6 +12,8 @@ export interface GuideStep {
   targets: string[];
   /** where the targets live: with none on screen, the bubble points at this tab */
   tab: GuideTab;
+  /** a GuideTarget on that tab that leads to the targets: with none of them on screen, the bubble points at it */
+  via?: string;
   /** the action that ends the step (Next still shows) */
   waitFor?: GuideEvent;
 }
@@ -30,11 +32,17 @@ export const STEPS: GuideStep[] = [
   },
   { targets: ['pools.guided'], tab: 'pools', waitFor: 'pool.opened', title: 'Pools', body: 'Each bubble is a pool. Open this one.' },
   {
-    targets: ['pool.boop'], tab: 'pools', waitFor: 'pool.booped', title: 'Boop',
+    targets: ['pool.boop'], tab: 'pools', via: 'pools.guided', waitFor: 'pool.booped', title: 'Boop',
     body: 'Every boop feeds the pot and restarts the clock. If nobody boops after you, you win.',
   },
-  { targets: ['pool.endNow'], tab: 'pools', waitFor: 'pool.ended', title: 'Skip the wait', body: 'In demo mode, end the clock now.' },
-  { targets: ['pool.claim'], tab: 'pools', waitFor: 'pool.claimed', title: 'You won', body: 'Claim the pot: your share is credited to you.' },
+  {
+    targets: ['pool.endNow'], tab: 'pools', via: 'pools.guided', waitFor: 'pool.ended', title: 'Skip the wait',
+    body: 'In demo mode, end the clock now.',
+  },
+  {
+    targets: ['pool.claim'], tab: 'pools', via: 'pools.guided', waitFor: 'pool.claimed', title: 'You won',
+    body: 'Claim the pot: your share is credited to you.',
+  },
   { targets: ['session.withdraw'], tab: 'session', waitFor: 'session.withdrew', title: 'Your winnings', body: 'Withdraw them to your balance.' },
   { targets: ['demo.badge'], tab: 'index', title: "That's the tour", body: 'Explore freely. Tap DEMO whenever you want to leave.' },
 ];

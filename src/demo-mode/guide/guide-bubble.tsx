@@ -1,3 +1,4 @@
+import { useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,8 +24,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, Ma
 
 /**
  * The guide's step, in a white bubble with an arrow at what it is about and a pulsing dot on it; the app around stays
- * usable. It points at the step's first target on screen; with none, at the tab to open. Nothing outside demo mode or
- * once the guide is over.
+ * usable. It points at the step's first target on screen; with none, at its way in (`via`), else at the tab to open.
+ * On a screen pushed over the tabs (no tab bar) it points at nothing there: the tabs stay mounted under it, so their
+ * places may still be known. Nothing outside demo mode or once the guide is over.
  */
 export function GuideBubble() {
   const on = useDemo((s) => s.on);
@@ -32,12 +34,22 @@ export function GuideBubble() {
   const rects = useStore(targetsStore, (s) => s.rects);
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  // the tab bar shows on the tabs' screens only (none known yet: the first screen, a tab)
+  const first: string | undefined = useSegments()[0];
+  const tabBar = !first || first === '(tabs)';
   const st = on && step !== null ? STEPS[step] : undefined;
   if (!st || step === null) return null;
 
   const hit = st.targets.find((id) => rects[id]);
-  const anchor = hit ? rects[hit] : rects[`tab.${st.tab}`];
-  const body = hit ? st.body : `Open ${TAB_LABELS[st.tab]} to continue.`;
+  const via = !hit && tabBar && st.via && rects[st.via] ? rects[st.via] : undefined;
+  const anchor = hit ? rects[hit] : via ?? (tabBar ? rects[`tab.${st.tab}`] : undefined);
+  const body = hit
+    ? st.body
+    : via
+      ? 'Open this pool to continue.'
+      : tabBar
+        ? `Open ${TAB_LABELS[st.tab]} to continue.`
+        : `Go back, then open ${TAB_LABELS[st.tab]}.`;
   const last = step === STEPS.length - 1;
 
   const bw = Math.min(width - 2 * space.l, MAX_WIDTH);
@@ -56,7 +68,7 @@ export function GuideBubble() {
     arrow = below ? { left: ax, top: -ARROW / 2 } : { left: ax, bottom: -ARROW / 2 };
     dot = { left: cx - DOT / 2, top: cy - DOT / 2 };
   } else {
-    place = { left: (width - bw) / 2, bottom: insets.bottom + TAB_BAR + space.s };
+    place = { left: (width - bw) / 2, bottom: insets.bottom + (tabBar ? TAB_BAR : 0) + space.s };
   }
 
   return (

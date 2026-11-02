@@ -21,7 +21,7 @@ function useShown() {
 }
 
 /**
- * Something the guide can point at. While the guide's step wants `id` (one of its targets, or its tab) and the screen
+ * Something the guide can point at. While the guide's step wants `id` (one of its targets, its way in, or its tab) and the screen
  * is shown, where it is goes to `targetsStore`, measured again as it moves; it is forgotten when the step moves on, the
  * screen is left or it unmounts. Outside demo mode it renders its children alone, as if it were not there.
  */
@@ -29,7 +29,7 @@ export function GuideTarget({ id, children, style }: { id: string; children: Rea
   const on = useDemo((s) => s.on);
   const wanted = useDemo((s) => {
     const step = s.on && s.guideStep !== null ? STEPS[s.guideStep] : undefined;
-    return !!step && (step.targets.includes(id) || id === `tab.${step.tab}`);
+    return !!step && (step.targets.includes(id) || id === step.via || id === `tab.${step.tab}`);
   });
   const shown = useShown();
   const view = useRef<ViewInstance>(null);

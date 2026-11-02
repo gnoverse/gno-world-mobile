@@ -40,6 +40,13 @@ test("records where it is while the step wants it, forgets it after", async () =
   expect(rects()).toEqual({});
 });
 
+test("records the step's way in too", async () => {
+  s().enter();
+  for (let i = 0; i < 6; i++) s().next(); // Boop: pool.boop, via pools.guided
+  await render(<GuideTarget id="pools.guided"><Text>pool</Text></GuideTarget>);
+  expect(Object.keys(rects())).toEqual(['pools.guided']);
+});
+
 test('unmounting forgets it', async () => {
   s().enter();
   await render(<GuideTarget id="home.price"><Text>price</Text></GuideTarget>);
