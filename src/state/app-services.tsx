@@ -7,7 +7,8 @@ import { useStore, type StoreApi } from 'zustand';
 
 import type { ChainApi } from '@/chain/api';
 import { GameClient } from '@/chain/game-client';
-import type { ChatClient } from '@/offchain/chat/client';
+import type { DemoControls } from '@/demo-mode/services';
+import { avatarUrl, type ChatClient } from '@/offchain/chat/client';
 import { followAppState } from '@/offchain/chat/app-state';
 import type { IdentityState } from '@/offchain/chat/identity-store';
 import type { ChatState } from '@/offchain/chat/store';
@@ -28,7 +29,7 @@ import { secureStore } from '@/utils/secure';
 
 type SessionStore = ReturnType<typeof createSessionStore>; // StoreApi<SessionState>, the persist API and `ready`
 
-interface Services {
+export interface Services {
   api: ChainApi;
   game: GameClient;
   offchain: Offchain;
@@ -45,53 +46,63 @@ interface Services {
   homeChannels: StoreApi<HomeChannelsState> & { ready: Promise<void> };
   /** the channel the Chat tab shows */
   chatChannel: StoreApi<ChatChannelState> & { ready: Promise<void> };
+  /** a chat avatar's image URI (the server's URL, or a data: URI in demo mode) */
+  avatarUri: (id: string) => string;
+  /** demo mode's controls; absent on the real network */
+  demo?: DemoControls;
 }
 
 const Ctx = createContext<Services | null>(null);
+
+/** The app's services on the real network: gnonative's chain, gno.world over HTTP, the phone's storage. */
+export function createRealServices(api: ChainApi): Services {
+  // The network gnonative is actually on. GnoNativeProvider starts on the settings' network; later
+  // switches become current only once gnonative has applied them (see network-sync.ts).
+  const { chainId, remote } = settingsStore.getState();
+  const net = createNetworkSync({
+    initial: { chainId, remote },
+    pause: () => session.getState().pause(),
+    apply: async (n) => {
+      await api.setRemote(n.remote);
+      await api.setChainID(n.chainId);
+    },
+    changed: async () => {
+      // before hydration, the launch-time restore() picks up the current network itself
+      if (session.ready.hasHydrated()) await session.getState().networkChanged();
+    },
+  });
+  const offchain = createOffchain({
+    baseUrl: () => settingsStore.getState().offchainUrl,
+    bid: () => browserId(secureStore, randomHex),
+  });
+  const { identityState, chatClient, chat, sync, rooms } = createChatServices({
+    offchain, secrets: secureStore, kv: AsyncStorage, crypto: expoCrypto, scope: () => settingsStore.getState().offchainUrl,
+    // a name the server wants proven: the wallet signs the phrase (GnoConnect connect + challenge)
+    wallet: walletEnabled ? { open: (url) => Linking.openURL(url).then(() => undefined), randomHex, network: () => net.current() } : undefined,
+  });
+  const homeChannels = createHomeChannels({ kv: AsyncStorage, scope: () => settingsStore.getState().offchainUrl });
+  const chatChannel = createChatChannel({ kv: AsyncStorage, scope: () => settingsStore.getState().offchainUrl });
+  const session = createSessionStore({
+    api: () => api,
+    secrets: secureStore,
+    storage: AsyncStorage,
+    openURL: (url) => Linking.openURL(url).then(() => undefined),
+    randomHex,
+    now: Date.now,
+    network: () => net.current(),
+    wallet: walletEnabled,
+  });
+  return {
+    api, game: new GameClient(api, () => net.current().chainId), offchain, session, net, chat, identity: identityState, chatClient, sync, rooms,
+    homeChannels, chatChannel, avatarUri: (id) => avatarUrl(settingsStore.getState().offchainUrl, id),
+  };
+}
 
 export function AppServices({ children }: PropsWithChildren) {
   const { gnonative } = useGnoNativeContext();
   const api: ChainApi = gnonative; // GnoNativeApi satisfies ChainApi (guarded by gnoNativeSatisfiesChainApi in src/chain/api.ts)
 
-  const services = useMemo<Services>(() => {
-    // The network gnonative is actually on. GnoNativeProvider starts on the settings' network; later
-    // switches become current only once gnonative has applied them (see network-sync.ts).
-    const { chainId, remote } = settingsStore.getState();
-    const net = createNetworkSync({
-      initial: { chainId, remote },
-      pause: () => session.getState().pause(),
-      apply: async (n) => {
-        await api.setRemote(n.remote);
-        await api.setChainID(n.chainId);
-      },
-      changed: async () => {
-        // before hydration, the launch-time restore() picks up the current network itself
-        if (session.ready.hasHydrated()) await session.getState().networkChanged();
-      },
-    });
-    const offchain = createOffchain({
-      baseUrl: () => settingsStore.getState().offchainUrl,
-      bid: () => browserId(secureStore, randomHex),
-    });
-    const { identityState, chatClient, chat, sync, rooms } = createChatServices({
-      offchain, secrets: secureStore, kv: AsyncStorage, crypto: expoCrypto, scope: () => settingsStore.getState().offchainUrl,
-      // a name the server wants proven: the wallet signs the phrase (GnoConnect connect + challenge)
-      wallet: walletEnabled ? { open: (url) => Linking.openURL(url).then(() => undefined), randomHex, network: () => net.current() } : undefined,
-    });
-    const homeChannels = createHomeChannels({ kv: AsyncStorage, scope: () => settingsStore.getState().offchainUrl });
-    const chatChannel = createChatChannel({ kv: AsyncStorage, scope: () => settingsStore.getState().offchainUrl });
-    const session = createSessionStore({
-      api: () => api,
-      secrets: secureStore,
-      storage: AsyncStorage,
-      openURL: (url) => Linking.openURL(url).then(() => undefined),
-      randomHex,
-      now: Date.now,
-      network: () => net.current(),
-      wallet: walletEnabled,
-    });
-    return { api, game: new GameClient(api, () => net.current().chainId), offchain, session, net, chat, identity: identityState, chatClient, sync, rooms, homeChannels, chatChannel };
-  }, [api]);
+  const services = useMemo<Services>(() => createRealServices(api), [api]);
 
   // follow network switches from Settings: gnonative first, then the session store
   useEffect(
