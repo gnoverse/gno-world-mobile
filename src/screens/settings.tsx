@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
@@ -9,6 +9,9 @@ import { Field } from '@/components/field';
 import { useSession } from '@/state/app-services';
 import { matchingPreset, NETWORK_PRESETS, settingsStore, useSettings, validateOffchainUrl, validateRemote } from '@/state/settings';
 import { colors, space } from '@/theme';
+
+/** The app's privacy policy, as given to the stores; Google Play also wants it reachable from inside the app. */
+export const PRIVACY_POLICY_URL = 'https://berty.tech/gno-world-privacy-policy';
 
 export function SettingsScreen() {
   const s = useSettings((x) => x);
@@ -61,6 +64,9 @@ export function SettingsScreen() {
           settingsStore.getState().setOffchainUrl(offchain);
         }}
       />
+      <Text style={styles.link} accessibilityRole="link" onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}>
+        Privacy policy
+      </Text>
       <Text style={styles.muted}>gno.world mobile {Constants.expoConfig?.version ?? ''}</Text>
     </Page>
   );
@@ -72,4 +78,5 @@ const styles = StyleSheet.create({
   h: { color: colors.fg, fontSize: 16, fontWeight: '700' },
   muted: { color: colors.muted },
   warn: { color: colors.accent },
+  link: { alignSelf: 'flex-start', color: colors.idle, textDecorationLine: 'underline' },
 });
