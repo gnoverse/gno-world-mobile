@@ -208,3 +208,15 @@ test('while another period loads, the figures keep the period they describe', as
   expect(screen.getByText('1d high')).toBeTruthy();
   expect(screen.queryByText('30d high')).toBeNull();
 });
+
+test("in demo mode, the DEMO badge shows over this full-screen modal, which hides the root's", async () => {
+  const { demoStore } = jest.requireActual<typeof import('@/demo-mode/store')>('@/demo-mode/store');
+  await render(<PriceFull initialDays={1} />);
+  expect(screen.queryByTestId('demo-badge')).toBeNull();
+  await act(() => demoStore.getState().enter());
+  try {
+    expect(screen.getByLabelText('Demo mode — tap to leave')).toBeTruthy();
+  } finally {
+    await act(() => demoStore.getState().leave());
+  }
+});
