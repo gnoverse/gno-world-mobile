@@ -103,7 +103,7 @@ export function PairScreen({ store, identity, demoCode }: { store: StoreApi<Sync
             maxLength={7}
           />
           <Button title={s.busy === 'accept' ? 'Pairing…' : 'Pair'} disabled={!!s.busy || !typed.trim()} onPress={() => void pair()} />
-          {demoCode ? <Text style={styles.muted}>{`Demo: type ${demoCode}, or any six letters and digits.`}</Text> : null}
+          {demoCode ? <Text style={styles.muted}>{`Demo: type ${demoCode}, or any six letters and digits (no 0, 1, I, L or O).`}</Text> : null}
         </GuideTarget>
         {s.acceptError ? <Text style={styles.bad}>{s.acceptError}</Text> : null}
         {outcome ? <Text style={styles.text}>{outcome}</Text> : null}

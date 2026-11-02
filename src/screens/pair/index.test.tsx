@@ -146,7 +146,7 @@ test("in demo mode, the guide's pairing target holds the code, Pair and the hint
     const target = within(screen.getByTestId('guide-target-pair.input'));
     expect(target.getByLabelText('pairing code')).toBeTruthy();
     expect(target.getByText('Pair')).toBeTruthy();
-    expect(target.getByText('Demo: type DEM234, or any six letters and digits.')).toBeTruthy();
+    expect(target.getByText('Demo: type DEM234, or any six letters and digits (no 0, 1, I, L or O).')).toBeTruthy();
   } finally {
     await act(() => demoStore.getState().leave());
   }
