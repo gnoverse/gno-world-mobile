@@ -85,7 +85,8 @@ export function PairScreen({ store, identity, demoCode }: { store: StoreApi<Sync
 
       <Card>
         <Text style={styles.h}>Enter a code</Text>
-        <GuideTarget id="pair.input">
+        {/* the code, Pair and the hint: the guide's bubble goes beside them all, not over Pair */}
+        <GuideTarget id="pair.input" style={styles.entry}>
           <TextInput
             accessibilityLabel="pairing code"
             style={styles.input}
@@ -101,9 +102,9 @@ export function PairScreen({ store, identity, demoCode }: { store: StoreApi<Sync
             autoCorrect={false}
             maxLength={7}
           />
+          <Button title={s.busy === 'accept' ? 'Pairing…' : 'Pair'} disabled={!!s.busy || !typed.trim()} onPress={() => void pair()} />
+          {demoCode ? <Text style={styles.muted}>{`Demo: type ${demoCode}, or any six letters and digits.`}</Text> : null}
         </GuideTarget>
-        <Button title={s.busy === 'accept' ? 'Pairing…' : 'Pair'} disabled={!!s.busy || !typed.trim()} onPress={() => void pair()} />
-        {demoCode ? <Text style={styles.muted}>{`Demo: type ${demoCode}, or any six letters and digits.`}</Text> : null}
         {s.acceptError ? <Text style={styles.bad}>{s.acceptError}</Text> : null}
         {outcome ? <Text style={styles.text}>{outcome}</Text> : null}
       </Card>
@@ -151,4 +152,6 @@ const styles = StyleSheet.create({
   bad: { color: colors.bad },
   code: { color: colors.accent, fontSize: 36, fontWeight: '700', letterSpacing: 8, fontVariant: ['tabular-nums'], fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
   input: { color: colors.fg, borderColor: colors.line, borderWidth: 1, borderRadius: radius.s, padding: space.m, letterSpacing: 4 },
+  // in demo mode only, a View around the code entry: the card's own gap
+  entry: { gap: space.s },
 });
