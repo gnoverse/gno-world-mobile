@@ -37,8 +37,9 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
   const status = useSession((s) => s.status);
   const refresh = useSession((s) => s.refresh);
   const country = usePresence((s) => s.country);
-  const flag = useSettings((s) => s.flag);
-  const ref = useSettings((s) => s.ref);
+  // demo mode neither reads nor uses the real settings' flag and referrer: the demo country, no referrer
+  const flag = useSettings((s) => (demo ? '' : s.flag));
+  const ref = useSettings((s) => (demo ? '' : s.ref));
   const now = useNow();
   const [pool, setPool] = useState<Pool | null>(null);
   const [realm, setRealm] = useState<RealmInfo | undefined>();
@@ -49,17 +50,22 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
   // a session made on another network is not "you" here
   const me = active && active.chainId === chainId ? active.master : '';
 
-  const load = useCallback(async () => {
-    if (!k) return;
+  /** the pool read, or undefined when it could not be */
+  const load = useCallback(async (): Promise<Pool | undefined> => {
+    if (!k) return undefined;
     try {
       const [p, r] = await Promise.all([game.pool(k.version, k.id), game.realm(k.version).catch(() => undefined)]);
       setPool(p);
       setRealm((before) => r ?? before); // a realm read that failed once keeps the shot prices on screen
       setLoadError('');
+      return p;
     } catch (e) {
       setLoadError(String((e as Error).message ?? e));
+      return undefined;
     }
   }, [game, k]);
+  // the demo's guide follows its own pool only
+  const guided = poolKey === GUIDED_POOL_KEY;
 
   // every 10 s while the screen is shown, and at once on coming back to it
   useFocusEffect(
@@ -72,8 +78,8 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
 
   // the demo's guide: the pool it asked to open is open
   useEffect(() => {
-    if (poolKey === GUIDED_POOL_KEY) demoStore.getState().emit('pool.opened');
-  }, [poolKey]);
+    if (guided) demoStore.getState().emit('pool.opened');
+  }, [guided]);
 
   // one runner for the screen's life: it keeps the transaction in flight across renders
   const [runner] = useState(() => createTxRunner(setBusy));
@@ -106,7 +112,7 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
       }
       if (c.flag && !demo) settingsStore.getState().setFlag(c.flag); // demo mode writes no settings
       await game.bid(active!, pool, { ref: effectiveRef, flag: c.flag, boost: c.boost, shot: c.shot });
-      demoStore.getState().emit('pool.booped');
+      if (guided) demoStore.getState().emit('pool.booped');
       // as the site does: the off-chain server ties this client to the account that booped (name reservation)
       void reportBoop({
         report: chatClient.reportBoop, readPool: () => game.pool(pool.version, pool.id),
@@ -169,9 +175,16 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
           <Button
             kind="secondary" title="⏩ End now · demo"
             onPress={() => {
-              demo.endNow(pool.key);
-              demoStore.getState().emit('pool.ended');
-              void reload();
+              try {
+                demo.endNow(pool.key);
+              } catch (e) {
+                setMsg(String((e as Error).message ?? e));
+                return;
+              }
+              // the clock is over, but a pool with no boop has no winner: the guide waits for one that really ended
+              void reload().then(([p]) => {
+                if (guided && p?.over) demoStore.getState().emit('pool.ended');
+              });
             }} />
         </GuideTarget>
       ) : null}
@@ -182,7 +195,7 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
             onPress={() =>
               run('claim', async () => {
                 const said = await game.claim(active, pool);
-                demoStore.getState().emit('pool.claimed');
+                if (guided) demoStore.getState().emit('pool.claimed');
                 return said;
               })
             }
