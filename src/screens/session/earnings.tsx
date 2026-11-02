@@ -14,7 +14,11 @@ import { useServices } from '@/state/app-services';
 import { colors, space } from '@/theme';
 import { gnot } from '@/utils/gnot';
 
-export function Earnings({ session }: { session: ActiveSession }) {
+export function Earnings({ session, onWithdrew }: {
+  session: ActiveSession;
+  /** a withdraw went through: the account's balance changed */
+  onWithdrew?: () => void;
+}) {
   const { game } = useServices();
   const [mes, setMes] = useState<Partial<Record<Version, Me>>>({});
   const [failed, setFailed] = useState<Version[]>([]); // versions whose earnings could not be read
@@ -67,6 +71,7 @@ export function Earnings({ session }: { session: ActiveSession }) {
               void runner(async () => {
                 try {
                   await game.withdraw(session, v);
+                  onWithdrew?.();
                   demoStore.getState().emit('session.withdrew');
                   if (mounted.current) setMsg(`withdrew ${gnot(m.owed)}`);
                 } catch (e) {

@@ -14,6 +14,11 @@ test('11 steps, each with a title, body and at least one target', () => {
   expect(STEPS[10].targets).toEqual(['demo.badge']);
 });
 
+test('the first send asks for a chat name, and the withdraw step points at the balance', () => {
+  expect(STEPS[2].body).toBe('Write a message and send it — the app asks for a chat name first. In demo mode, only you see it.');
+  expect(STEPS[9].body).toBe('Withdraw them, and watch your account balance go up.');
+});
+
 test('every waitFor is a GuideEvent the screens emit', () => {
   const waits = STEPS.flatMap((s) => (s.waitFor ? [s.waitFor] : []));
   expect(new Set(waits)).toEqual(new Set(GUIDE_EVENTS));

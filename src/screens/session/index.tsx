@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, StyleSheet, Text } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -42,6 +42,8 @@ export function SessionScreen() {
   const [renewing, setRenewing] = useState(false);
   const [topUp, setTopUp] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
+  // the timer's re-read, for a withdraw to show its money at once
+  const reread = useRef<() => void>(undefined);
 
   useEffect(() => {
     if (!shown) return;
@@ -53,9 +55,11 @@ export function SessionScreen() {
     };
     void tick();
     const t = setInterval(tick, 15000);
+    reread.current = () => void tick();
     return () => {
       alive = false;
       clearInterval(t);
+      reread.current = undefined;
       setBalance(null);
     };
   }, [shown, api, refresh]);
@@ -222,7 +226,7 @@ export function SessionScreen() {
           />
         </Card>
         {s.previous ? <PreviousSession /> : null}
-        <Earnings session={s.active} />
+        <Earnings session={s.active} onWithdrew={() => reread.current?.()} />
       </>,
     );
   }

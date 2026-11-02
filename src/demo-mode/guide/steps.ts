@@ -24,7 +24,7 @@ export const TAB_LABELS: Record<GuideTab, string> = { index: 'Home', chat: 'Chat
 export const STEPS: GuideStep[] = [
   { targets: ['home.price'], tab: 'index', title: 'GNOT price', body: 'The price of GNOT, the coin every boop is paid in. Tap the card for the chart.' },
   { targets: ['home.here'], tab: 'index', title: 'Here now', body: 'Who is on gno.world right now, and from where.' },
-  { targets: ['chat.composer'], tab: 'chat', waitFor: 'chat.sent', title: 'Say hello', body: 'Write a message and send it. In demo mode, only you see it.' },
+  { targets: ['chat.composer'], tab: 'chat', waitFor: 'chat.sent', title: 'Say hello', body: 'Write a message and send it — the app asks for a chat name first. In demo mode, only you see it.' },
   { targets: ['chat.line'], tab: 'chat', waitFor: 'chat.reacted', title: 'React', body: 'Long-press a message to react to it.' },
   {
     targets: ['pair.input', 'chat.menu'], tab: 'chat', waitFor: 'pair.paired', title: 'Pair with a browser',
@@ -43,6 +43,6 @@ export const STEPS: GuideStep[] = [
     targets: ['pool.claim'], tab: 'pools', via: 'pools.guided', waitFor: 'pool.claimed', title: 'You won',
     body: 'Claim the pot: your share is credited to you.',
   },
-  { targets: ['session.withdraw'], tab: 'session', waitFor: 'session.withdrew', title: 'Your winnings', body: 'Withdraw them to your balance.' },
+  { targets: ['session.withdraw'], tab: 'session', waitFor: 'session.withdrew', title: 'Your winnings', body: 'Withdraw them, and watch your account balance go up.' },
   { targets: ['demo.badge'], tab: 'index', title: "That's the tour", body: 'Explore freely. Tap DEMO whenever you want to leave.' },
 ];
