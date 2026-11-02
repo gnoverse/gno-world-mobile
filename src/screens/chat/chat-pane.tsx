@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, StyleSheet, Text } from 'react-native';
 import { useStore, type StoreApi } from 'zustand';
 
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
+import { demoStore, useDemo } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import { isMine } from '@/offchain/chat/merge';
 import type { IdentityState } from '@/offchain/chat/identity-store';
@@ -18,13 +20,15 @@ import { Pins } from './pins';
 
 const NO_REACTIONS: string[] = [];
 
-export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityOpen, placeholder, canModerate }: {
+export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityOpen, placeholder, canModerate, guided }: {
   store: StoreApi<ChatState>; identity: StoreApi<IdentityState>; avatarUri: (id: string) => string; onOpenIdentity?: () => void;
   /** the name sheet is showing */
   identityOpen?: boolean;
   placeholder?: string;
   /** the app holds the room's maker key: lines can be pinned and removed */
   canModerate?: boolean;
+  /** the channel the demo's guide shows (Public): its newest line not written here is the React step's target */
+  guided?: boolean;
 }) {
   const s = useStore(store);
   const me = useStore(identity, (i) => i.identity);
@@ -40,6 +44,8 @@ export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityO
   const data = useMemo(() => [...s.lines].reverse(), [s.lines]);
   const newestId = s.lines.at(-1)?.id ?? 0;
   const mine = useCallback((l: ChatLine) => isMine(l, s.you, s.mine), [s.you, s.mine]);
+  const demoOn = useDemo((d) => d.on);
+  const guideLine = demoOn && guided ? data.find((l) => !mine(l))?.id : undefined;
 
   // while the tab is shown, what arrives is seen
   useFocusEffect(
@@ -49,7 +55,10 @@ export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityO
   );
 
   const openMenu = useCallback((l: ChatLine) => setMenuFor(l), []);
-  const react = useCallback((l: ChatLine, e: string) => void store.getState().react(l.id, e), [store]);
+  const react = useCallback((l: ChatLine, e: string) => {
+    void store.getState().react(l.id, e);
+    demoStore.getState().emit('chat.reacted');
+  }, [store]);
   const vote = useCallback((l: ChatLine, i: number) => void store.getState().vote(l.id, i), [store]);
   // reads the store, not `data`: stays the same function while lines arrive
   const jumpTo = useCallback((id: number) => {
@@ -57,13 +66,16 @@ export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityO
     const i = lines.findIndex((l) => l.id === id);
     if (i >= 0) list.current?.scrollToIndex({ index: lines.length - 1 - i, viewPosition: 0.5 });
   }, [store]);
-  const renderItem = useCallback(({ item }: { item: ChatLine }) => (
-    <ChatLineRow
-      line={item} mine={mine(item)} now={now} avatarUri={avatarUri}
-      myReactions={s.myReactions[item.id] ?? NO_REACTIONS} myVote={s.myVotes[item.id]}
-      onLongPress={openMenu} onJump={jumpTo} onReact={react} onVote={vote}
-    />
-  ), [mine, now, avatarUri, s.myReactions, s.myVotes, openMenu, jumpTo, react, vote]);
+  const renderItem = useCallback(({ item }: { item: ChatLine }) => {
+    const row = (
+      <ChatLineRow
+        line={item} mine={mine(item)} now={now} avatarUri={avatarUri}
+        myReactions={s.myReactions[item.id] ?? NO_REACTIONS} myVote={s.myVotes[item.id]}
+        onLongPress={openMenu} onJump={jumpTo} onReact={react} onVote={vote}
+      />
+    );
+    return item.id === guideLine ? <GuideTarget id="chat.line">{row}</GuideTarget> : row;
+  }, [mine, now, avatarUri, s.myReactions, s.myVotes, openMenu, jumpTo, react, vote, guideLine]);
   const myName = me.reservedName || me.name;
   // the held-back line goes out when the sheet closes with a name (not as soon as one is saved: "Reserve" saves the
   // name, then reserves it — the line must carry the key); closing it without a name drops the line
@@ -102,6 +114,7 @@ export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityO
         onSend={async (text) => {
           const st = store.getState();
           const ok = editing ? await st.edit(editing.id, text) : await st.send(text, reply?.id);
+          if (ok && !editing) demoStore.getState().emit('chat.sent');
           if (ok) {
             setReply(null);
             setEditing(null);
@@ -132,7 +145,7 @@ export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityO
           setEditing(l);
           composer.current?.focus();
         }}
-        onReact={(l, e) => void store.getState().react(l.id, e)}
+        onReact={react}
         onWithdraw={() => void store.getState().withdraw()}
         onPin={canModerate ? (l, on) => void store.getState().pin(l.id, on) : undefined}
         onDelete={canModerate ? (l) => void store.getState().deleteLine(l.id) : undefined}

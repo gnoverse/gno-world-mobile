@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Polyline } from 'react-native-svg';
 
 import { Card } from '@/components/card';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
 import { PRICE_DAYS, type PriceDays, type Prices } from '@/offchain/home';
 import { colors, radius, space } from '@/theme';
 
@@ -36,40 +37,42 @@ export function PriceCard({
   const geom = shown && plot.width && plot.height ? chartGeom(shown.series, plot.width, plot.height) : null;
   const figure = shown && formatFdv(shown);
   return (
-    // a tap anywhere but the periods opens it; not one accessible element, so the periods and › stay reachable
-    <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => pressed && styles.pressed}>
-      <Card style={styles.card}>
-        <View style={styles.head}>
-          <Text style={styles.label}>GNOT</Text>
-          <View style={styles.right}>
-            <Periods days={days} onDays={onDays} />
-            <OpenButton label="Open GNOT full screen" onPress={onOpen} />
+    <GuideTarget id="home.price">
+      {/* a tap anywhere but the periods opens it; not one accessible element, so the periods and › stay reachable */}
+      <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => pressed && styles.pressed}>
+        <Card style={styles.card}>
+          <View style={styles.head}>
+            <Text style={styles.label}>GNOT</Text>
+            <View style={styles.right}>
+              <Periods days={days} onDays={onDays} />
+              <OpenButton label="Open GNOT full screen" onPress={onOpen} />
+            </View>
           </View>
-        </View>
-        {shown && (
-          <View style={styles.now}>
-            <Text style={styles.price}>{formatPrice(shown.now)}</Text>
-            <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
+          {shown && (
+            <View style={styles.now}>
+              <Text style={styles.price}>{formatPrice(shown.now)}</Text>
+              <Text style={{ color: shown.change < 0 ? colors.bad : colors.ring }}>{formatChange(shown.change)}</Text>
+            </View>
+          )}
+          <View testID="price-chart-box" accessibilityState={{ busy: stale }} style={[styles.chart, stale && styles.stale]}>
+            {geom && <Text style={styles.small}>{formatPrice(geom.max)}</Text>}
+            {/* the chart takes the height the card leaves it */}
+            <View testID="price-plot" style={styles.plot} onLayout={(e) => setPlot({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
+              {geom && (
+                <Svg testID="price-chart" width={plot.width} height={plot.height} style={styles.svg}>
+                  <Polyline points={geom.points} fill="none" stroke={colors.accent} strokeWidth={2} strokeLinejoin="round" />
+                </Svg>
+              )}
+              {data && !shown && !stale && <Text style={styles.small}>{NO_PRICES}</Text>}
+              {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
+            </View>
+            {geom && <Text style={styles.small}>{formatPrice(geom.min)}</Text>}
           </View>
-        )}
-        <View testID="price-chart-box" accessibilityState={{ busy: stale }} style={[styles.chart, stale && styles.stale]}>
-          {geom && <Text style={styles.small}>{formatPrice(geom.max)}</Text>}
-          {/* the chart takes the height the card leaves it */}
-          <View testID="price-plot" style={styles.plot} onLayout={(e) => setPlot({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}>
-            {geom && (
-              <Svg testID="price-chart" width={plot.width} height={plot.height} style={styles.svg}>
-                <Polyline points={geom.points} fill="none" stroke={colors.accent} strokeWidth={2} strokeLinejoin="round" />
-              </Svg>
-            )}
-            {data && !shown && !stale && <Text style={styles.small}>{NO_PRICES}</Text>}
-            {(!data || (stale && !shown)) && !failed && <Text style={styles.small}>loading…</Text>}
-          </View>
-          {geom && <Text style={styles.small}>{formatPrice(geom.min)}</Text>}
-        </View>
-        {figure && <Text style={styles.small}>{figure}</Text>}
-        {failed && <Text style={styles.small}>{PRICES_BUSY}</Text>}
-      </Card>
-    </Pressable>
+          {figure && <Text style={styles.small}>{figure}</Text>}
+          {failed && <Text style={styles.small}>{PRICES_BUSY}</Text>}
+        </Card>
+      </Pressable>
+    </GuideTarget>
   );
 }
 

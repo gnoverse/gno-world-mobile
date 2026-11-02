@@ -1,6 +1,7 @@
 import { useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type TextInputInstance } from 'react-native';
 
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
 import type { ChatLine } from '@/offchain/chat/types';
 import { colors, radius, space } from '@/theme';
 
@@ -40,38 +41,40 @@ export function Composer({ ref, reply, editing, typing, error, needsName, onNeed
   const input = useRef<TextInputInstance>(null);
   useImperativeHandle(ref, () => ({ focus: () => input.current?.focus(), send: () => void send() }));
   return (
-    <View style={[styles.box, { paddingBottom: space.s + bottomInset }]}>
-      {typing ? <Text style={styles.typing} numberOfLines={1}>{typing}</Text> : null}
-      {error ? (
-        <Pressable onPress={onDismissError}>
-          <Text style={styles.error}>{error}</Text>
-        </Pressable>
-      ) : null}
-      {strip ? (
-        <View style={styles.strip}>
-          <Text style={styles.stripText} numberOfLines={1}>{strip}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="cancel" onPress={() => {
-            onCancel();
-            if (editing) setText('');
-          }}>
-            <Text style={styles.stripText}>✕</Text>
+    <GuideTarget id="chat.composer">
+      <View style={[styles.box, { paddingBottom: space.s + bottomInset }]}>
+        {typing ? <Text style={styles.typing} numberOfLines={1}>{typing}</Text> : null}
+        {error ? (
+          <Pressable onPress={onDismissError}>
+            <Text style={styles.error}>{error}</Text>
+          </Pressable>
+        ) : null}
+        {strip ? (
+          <View style={styles.strip}>
+            <Text style={styles.stripText} numberOfLines={1}>{strip}</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="cancel" onPress={() => {
+              onCancel();
+              if (editing) setText('');
+            }}>
+              <Text style={styles.stripText}>✕</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        <View style={styles.row}>
+          <TextInput
+            ref={input} style={styles.input} value={text} multiline placeholder={placeholder} placeholderTextColor={colors.muted}
+            onChangeText={(t) => {
+              setText(t);
+              onChange(t.length);
+            }}
+          />
+          <Pressable accessibilityRole="button" accessibilityLabel={editing ? 'save' : 'send'} disabled={busy || !text.trim()} onPress={() => void send()}
+            style={[styles.send, (busy || !text.trim()) && styles.dim]}>
+            <Text style={styles.sendText}>{editing ? 'save' : 'send'}</Text>
           </Pressable>
         </View>
-      ) : null}
-      <View style={styles.row}>
-        <TextInput
-          ref={input} style={styles.input} value={text} multiline placeholder={placeholder} placeholderTextColor={colors.muted}
-          onChangeText={(t) => {
-            setText(t);
-            onChange(t.length);
-          }}
-        />
-        <Pressable accessibilityRole="button" accessibilityLabel={editing ? 'save' : 'send'} disabled={busy || !text.trim()} onPress={() => void send()}
-          style={[styles.send, (busy || !text.trim()) && styles.dim]}>
-          <Text style={styles.sendText}>{editing ? 'save' : 'send'}</Text>
-        </Pressable>
       </View>
-    </View>
+    </GuideTarget>
   );
 }
 

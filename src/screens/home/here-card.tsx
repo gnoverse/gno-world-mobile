@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 
 import { Card } from '@/components/card';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
 import type { Where } from '@/offchain/home';
 import { colors, space } from '@/theme';
 import { flagEmoji } from '@/utils/flag';
@@ -14,34 +15,36 @@ export function HereCard({ data, failed, onOpen }: { data: Where | null; failed:
   const rows = data ? hereRows(data) : [];
   const list = useRef<ScrollViewInstance>(null);
   return (
-    <Card style={styles.card}>
-      {/* a tap on the header or the rows opens it full screen; the press areas sit inside the list, so a drag still
-          scrolls it, and they are not accessible elements, so the rows stay readable one by one */}
-      <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => [styles.head, pressed && styles.pressed]}>
-        <Text style={styles.label}>HERE NOW</Text>
-        <View style={styles.right}>
-          {data && <Text style={styles.total}>{hereText(data)}</Text>}
-          <OpenButton label="Open Here Now full screen" onPress={onOpen} />
-        </View>
-      </Pressable>
-      {/* a long table scrolls within the card (Android scrolls a list inside the page only when told); a flash of the bar says there is more */}
-      <ScrollView
-        ref={list}
-        testID="here-rows"
-        style={styles.rows}
-        contentContainerStyle={styles.rowsGrow}
-        nestedScrollEnabled
-        onContentSizeChange={() => list.current?.flashScrollIndicators()}>
-        <Pressable testID="here-rows-press" accessible={false} onPress={onOpen} style={({ pressed }) => [styles.rowsIn, pressed && styles.pressed]}>
-          {rows.map((r) => (
-            <CountryRow key={r.cc || r.name} row={r} />
-          ))}
-          {data && !rows.length && <Text style={styles.muted}>nobody yet</Text>}
-          {!data && !failed && <Text style={styles.muted}>loading…</Text>}
-          {failed && <Text style={styles.muted}>{data ? 'could not refresh — trying again' : 'server unreachable — trying again'}</Text>}
+    <GuideTarget id="home.here">
+      <Card style={styles.card}>
+        {/* a tap on the header or the rows opens it full screen; the press areas sit inside the list, so a drag still
+            scrolls it, and they are not accessible elements, so the rows stay readable one by one */}
+        <Pressable accessible={false} onPress={onOpen} style={({ pressed }) => [styles.head, pressed && styles.pressed]}>
+          <Text style={styles.label}>HERE NOW</Text>
+          <View style={styles.right}>
+            {data && <Text style={styles.total}>{hereText(data)}</Text>}
+            <OpenButton label="Open Here Now full screen" onPress={onOpen} />
+          </View>
         </Pressable>
-      </ScrollView>
-    </Card>
+        {/* a long table scrolls within the card (Android scrolls a list inside the page only when told); a flash of the bar says there is more */}
+        <ScrollView
+          ref={list}
+          testID="here-rows"
+          style={styles.rows}
+          contentContainerStyle={styles.rowsGrow}
+          nestedScrollEnabled
+          onContentSizeChange={() => list.current?.flashScrollIndicators()}>
+          <Pressable testID="here-rows-press" accessible={false} onPress={onOpen} style={({ pressed }) => [styles.rowsIn, pressed && styles.pressed]}>
+            {rows.map((r) => (
+              <CountryRow key={r.cc || r.name} row={r} />
+            ))}
+            {data && !rows.length && <Text style={styles.muted}>nobody yet</Text>}
+            {!data && !failed && <Text style={styles.muted}>loading…</Text>}
+            {failed && <Text style={styles.muted}>{data ? 'could not refresh — trying again' : 'server unreachable — trying again'}</Text>}
+          </Pressable>
+        </ScrollView>
+      </Card>
+    </GuideTarget>
   );
 }
 

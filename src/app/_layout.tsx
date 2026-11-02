@@ -2,6 +2,7 @@ import { GnoNativeProvider } from '@gnolang/gnonative';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { GuideBubble } from '@/demo-mode/guide/guide-bubble';
 import { DemoBadge } from '@/demo-mode/ui/badge';
 import { DemoOffer } from '@/demo-mode/ui/offer-modal';
 import { AppServices } from '@/state/app-services';
@@ -35,6 +36,8 @@ export default function RootLayout() {
           <Stack.Screen name="home/chat" options={{ presentation: 'modal', headerShown: false }} />
         </Stack>
         <DemoBadge />
+        {/* over every screen and the badge; the app under it stays usable */}
+        <GuideBubble />
         <DemoOffer />
       </AppServices>
     </GnoNativeProvider>

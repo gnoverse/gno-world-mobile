@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
 import type { ChatIdentity } from '@/offchain/chat/identity';
 import { colors, space } from '@/theme';
 
@@ -20,9 +21,11 @@ export function ChatHeader({ here, me, onOpenIdentity, onAdd, onMenu }: {
         <Pressable accessibilityRole="button" accessibilityLabel="New room" hitSlop={8} onPress={onAdd}>
           <Text style={styles.icon}>＋</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" accessibilityLabel="Channel menu" hitSlop={8} onPress={onMenu}>
-          <Text style={styles.icon}>⋯</Text>
-        </Pressable>
+        <GuideTarget id="chat.menu">
+          <Pressable accessibilityRole="button" accessibilityLabel="Channel menu" hitSlop={8} onPress={onMenu}>
+            <Text style={styles.icon}>⋯</Text>
+          </Pressable>
+        </GuideTarget>
       </View>
     </View>
   );

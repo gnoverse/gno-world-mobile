@@ -106,7 +106,7 @@ export function ChatScreen() {
       <ChatPane
         key={current}
         store={store} identity={identity} avatarUri={avatarUri} onOpenIdentity={() => setSheet(true)} identityOpen={sheet}
-        placeholder={`say something in ${name}`} canModerate={!!current && !!rooms.getState().keyOf(current)}
+        placeholder={`say something in ${name}`} canModerate={!!current && !!rooms.getState().keyOf(current)} guided={!current}
       />
       <IdentitySheet store={identity} visible={sheet} onClose={() => setSheet(false)} avatarUri={avatarUri} identity={active?.master ?? ''} />
       <RoomMenu id={current} visible={menu} onClose={() => setMenu(false)} onLeft={() => chatChannel.getState().select('')} />

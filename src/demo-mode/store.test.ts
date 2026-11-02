@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { STEPS } from './guide/steps';
 import { demoStore, GUIDE_EVENTS, GUIDE_WAITS } from './store';
 
 const s = () => demoStore.getState();
@@ -100,6 +101,8 @@ test('every guide event, once each, in the steps order', () => {
   expect(GUIDE_EVENTS).toEqual([
     'chat.sent', 'chat.reacted', 'pair.paired', 'pool.opened', 'pool.booped', 'pool.ended', 'pool.claimed', 'session.withdrew',
   ]);
+  // the steps say what they wait for: one step per wait, the events once each
+  expect(GUIDE_WAITS).toEqual(STEPS.map((st) => st.waitFor ?? null));
   expect(GUIDE_WAITS.filter((w) => w !== null)).toEqual(GUIDE_EVENTS);
   expect(GUIDE_WAITS).toHaveLength(11);
 });

@@ -1,5 +1,5 @@
 import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Share, StyleSheet, Text } from 'react-native';
 
 import type { Pool, RealmInfo } from '@/chain/parse';
@@ -8,6 +8,9 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Page } from '@/components/page';
 import { Countdown } from '@/components/countdown';
+import { GUIDED_POOL_KEY } from '@/demo-mode/constants';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
+import { demoStore } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import { reportBoop } from '@/offchain/chat/boop-report';
 import { isPlayBlocked, NOPLAY_TEXT, usePresence } from '@/offchain/presence';
@@ -67,6 +70,11 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
     }, [load]),
   );
 
+  // the demo's guide: the pool it asked to open is open
+  useEffect(() => {
+    if (poolKey === GUIDED_POOL_KEY) demoStore.getState().emit('pool.opened');
+  }, [poolKey]);
+
   // one runner for the screen's life: it keeps the transaction in flight across renders
   const [runner] = useState(() => createTxRunner(setBusy));
   const reload = () => Promise.all([load(), refresh().catch(() => undefined)]);
@@ -98,6 +106,7 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
       }
       if (c.flag && !demo) settingsStore.getState().setFlag(c.flag); // demo mode writes no settings
       await game.bid(active!, pool, { ref: effectiveRef, flag: c.flag, boost: c.boost, shot: c.shot });
+      demoStore.getState().emit('pool.booped');
       // as the site does: the off-chain server ties this client to the account that booped (name reservation)
       void reportBoop({
         report: chatClient.reportBoop, readPool: () => game.pool(pool.version, pool.id),
@@ -145,23 +154,41 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
               <Link href="/session" style={styles.link}>Get a session for {chainId} →</Link>
             </>
           ) : (
-            <BoopPanel
-              pool={pool} realm={realm} me={me} hasRef={!!effectiveRef} defaultFlag={flag || country}
-              suggestions={suggestions} busy={busy} budget={budget} onBoop={onBoop}
-            />
+            <GuideTarget id="pool.boop">
+              <BoopPanel
+                pool={pool} realm={realm} me={me} hasRef={!!effectiveRef} defaultFlag={flag || country}
+                suggestions={suggestions} busy={busy} budget={budget} onBoop={onBoop}
+              />
+            </GuideTarget>
           )}
         </Card>
       ) : null}
 
       {demo && live ? (
-        <Button
-          kind="secondary" title="⏩ End now · demo"
-          onPress={() => {
-            demo.endNow(pool.key);
-            void reload();
-          }} />
+        <GuideTarget id="pool.endNow">
+          <Button
+            kind="secondary" title="⏩ End now · demo"
+            onPress={() => {
+              demo.endNow(pool.key);
+              demoStore.getState().emit('pool.ended');
+              void reload();
+            }} />
+        </GuideTarget>
       ) : null}
-      {closedUnpaid && active ? <Button title="claim" disabled={busy} onPress={() => run('claim', () => game.claim(active, pool))} /> : null}
+      {closedUnpaid && active ? (
+        <GuideTarget id="pool.claim">
+          <Button
+            title="claim" disabled={busy}
+            onPress={() =>
+              run('claim', async () => {
+                const said = await game.claim(active, pool);
+                demoStore.getState().emit('pool.claimed');
+                return said;
+              })
+            }
+          />
+        </GuideTarget>
+      ) : null}
       {canCancel ? <Button kind="danger" title="cancel this pool" disabled={busy} onPress={() => run('cancel', () => game.cancel(active!, pool))} /> : null}
       {msg ? <Text style={styles.msg}>{msg}</Text> : null}
       {loadError ? <Text style={styles.warn}>Could not refresh this pool: {loadError}</Text> : null}

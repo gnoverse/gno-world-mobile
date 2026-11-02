@@ -6,6 +6,8 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Countdown } from '@/components/countdown';
 import { Page } from '@/components/page';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
+import { demoStore } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import type { ChatIdentity } from '@/offchain/chat/identity';
 import type { SyncState } from '@/offchain/sync/store';
@@ -45,6 +47,7 @@ export function PairScreen({ store, identity, demoCode }: { store: StoreApi<Sync
     if (words) {
       setOutcome(words);
       setTyped('');
+      demoStore.getState().emit('pair.paired');
     }
   };
   const stop = () =>
@@ -82,21 +85,23 @@ export function PairScreen({ store, identity, demoCode }: { store: StoreApi<Sync
 
       <Card>
         <Text style={styles.h}>Enter a code</Text>
-        <TextInput
-          accessibilityLabel="pairing code"
-          style={styles.input}
-          value={typed}
-          onChangeText={(t) => {
-            setTyped(t);
-            setOutcome('');
-            if (store.getState().acceptError) store.getState().clearError();
-          }}
-          placeholder="a code from the other device"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={7}
-        />
+        <GuideTarget id="pair.input">
+          <TextInput
+            accessibilityLabel="pairing code"
+            style={styles.input}
+            value={typed}
+            onChangeText={(t) => {
+              setTyped(t);
+              setOutcome('');
+              if (store.getState().acceptError) store.getState().clearError();
+            }}
+            placeholder="a code from the other device"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={7}
+          />
+        </GuideTarget>
         <Button title={s.busy === 'accept' ? 'Pairing…' : 'Pair'} disabled={!!s.busy || !typed.trim()} onPress={() => void pair()} />
         {demoCode ? <Text style={styles.muted}>{`Demo: type ${demoCode}, or any six letters and digits.`}</Text> : null}
         {s.acceptError ? <Text style={styles.bad}>{s.acceptError}</Text> : null}

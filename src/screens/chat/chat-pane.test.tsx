@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
-import { Alert, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, TextInput, View } from 'react-native';
 
+import { targetsStore } from '@/demo-mode/guide/targets';
+import { demoStore } from '@/demo-mode/store';
 import type { ChatClient } from '@/offchain/chat/client';
 import { NO_IDENTITY, type ChatIdentity } from '@/offchain/chat/identity';
 import { createIdentityState } from '@/offchain/chat/identity-store';
@@ -249,4 +251,33 @@ test('the composer\'s placeholder is the one given', async () => {
   const { store } = storeWith({ ...NO_IDENTITY, name: 'ann' });
   await render(<ChatPane store={store} identity={ids} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} placeholder="say something in Dev chat" />);
   expect(screen.getByPlaceholderText('say something in Dev chat')).toBeTruthy();
+});
+
+test("demo mode's guide: a sent line and a reaction move it on; the newest line of someone else is its target", async () => {
+  const measure = jest.spyOn(View.prototype as unknown as { measureInWindow(cb: (...n: number[]) => void): void }, 'measureInWindow')
+    .mockImplementation((cb) => cb(0, 100, 300, 50));
+  const { store } = storeWith({ ...NO_IDENTITY, name: 'ann' }, [line(1, { name: 'bob', body: 'older' }), line(2, { name: 'bob', body: 'his line' })]);
+  store.setState({ react: jest.fn(async () => undefined) });
+  store.getState().start();
+  await waitFor(() => expect(store.getState().phase).toBe('unreachable'));
+  demoStore.getState().enter();
+  try {
+    await act(() => {
+      demoStore.getState().next();
+      demoStore.getState().next(); // Say hello: waits for chat.sent
+    });
+    await render(<ChatPane store={store} identity={ids} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} guided />);
+    await fireEvent.changeText(screen.getByPlaceholderText('say something'), 'hi');
+    await fireEvent.press(screen.getByLabelText('send'));
+    await waitFor(() => expect(demoStore.getState().guideStep).toBe(3));
+    // React: the newest line not mine is pointed at
+    await waitFor(() => expect(targetsStore.getState().rects['chat.line']).toEqual({ x: 0, y: 100, w: 300, h: 50 }));
+    await fireEvent(screen.getByText('his line'), 'longPress');
+    await fireEvent.press(screen.getByLabelText('react 👍'));
+    expect(demoStore.getState().guideStep).toBe(4);
+  } finally {
+    await act(() => demoStore.getState().leave());
+    measure.mockRestore();
+    await act(() => store.getState().stop());
+  }
 });

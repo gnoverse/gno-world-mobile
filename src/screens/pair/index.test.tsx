@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-
 import { Alert, type AlertButton } from 'react-native';
 import { createStore } from 'zustand/vanilla';
 
+import { demoStore } from '@/demo-mode/store';
 import { NO_IDENTITY } from '@/offchain/chat/identity';
 import type { SyncState } from '@/offchain/sync/store';
 import { PairScreen, SPENT } from '@/screens/pair';
@@ -120,4 +121,19 @@ test('typing a new code clears the last outcome', async () => {
   await waitFor(() => expect(screen.getByText(SPENT)).toBeTruthy());
   await fireEvent.changeText(screen.getByLabelText('pairing code'), 'Q');
   expect(screen.queryByText(SPENT)).toBeNull();
+});
+
+test("in demo mode, pairing moves the guide's pairing step on", async () => {
+  jest.spyOn(Alert, 'alert').mockImplementation(press('Continue'));
+  demoStore.getState().enter();
+  for (let i = 0; i < 4; i++) demoStore.getState().next(); // Pair with a browser
+  try {
+    await render(<PairScreen store={make()} identity={NO_IDENTITY} demoCode="DEM234" />);
+    await fireEvent.changeText(screen.getByLabelText('pairing code'), 'DEM234');
+    await fireEvent.press(screen.getByText('Pair'));
+    await waitFor(() => expect(screen.getByText(WORDS)).toBeTruthy());
+    expect(demoStore.getState().guideStep).toBe(5);
+  } finally {
+    await act(() => demoStore.getState().leave());
+  }
 });

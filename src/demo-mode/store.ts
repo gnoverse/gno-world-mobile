@@ -3,6 +3,8 @@
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
+import { STEPS } from './guide/steps';
+
 export type GuideEvent =
   | 'chat.sent' | 'chat.reacted' | 'pair.paired' | 'pool.opened' | 'pool.booped' | 'pool.ended' | 'pool.claimed'
   | 'session.withdrew';
@@ -12,11 +14,8 @@ export const GUIDE_EVENTS: readonly GuideEvent[] = [
   'chat.sent', 'chat.reacted', 'pair.paired', 'pool.opened', 'pool.booped', 'pool.ended', 'pool.claimed', 'session.withdrew',
 ];
 
-/** what each guide step waits for (null: a step to read, Next only); the guide's steps follow this list, one for one */
-export const GUIDE_WAITS: readonly (GuideEvent | null)[] = [
-  null, null, 'chat.sent', 'chat.reacted', 'pair.paired', 'pool.opened', 'pool.booped', 'pool.ended', 'pool.claimed',
-  'session.withdrew', null,
-];
+/** what each guide step waits for (null: a step to read, Next only), from the steps themselves */
+export const GUIDE_WAITS: readonly (GuideEvent | null)[] = STEPS.map((st) => st.waitFor ?? null);
 
 export interface DemoState {
   on: boolean;
