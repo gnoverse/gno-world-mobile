@@ -1,4 +1,5 @@
 import { ugnot } from '@/chain/api';
+import { classifyError } from '@/chain/errors';
 import { GameClient } from '@/chain/game-client';
 import { SESSION_ALLOW_PATHS } from '@/chain/realms';
 import { price } from '@/game/pricing';
@@ -68,9 +69,14 @@ test('a refused rule throws like the chain', async () => {
   const { game, sim, session } = setup();
   const pool = await game.pool(6, 3);
   sim.endNow(3);
-  await expect(game.bid(session, pool, { ref: '', flag: 'FR', boost: 1, shot: 0 })).rejects.toThrow(/pool is over/);
-  await expect(game.bid(session, { ...pool, id: 1, version: 6, nextPrice: 1 }, { ref: '', flag: 'FR', boost: 1, shot: 0 }))
-    .rejects.toThrow(/price is/);
+  const err1 = await game.bid(session, pool, { ref: '', flag: 'FR', boost: 1, shot: 0 }).catch((e) => e);
+  expect(err1.message).toMatch(/pool is closed/);
+  expect(classifyError(err1).kind).toBe('realm');
+  const err2 = await game
+    .bid(session, { ...pool, id: 1, version: 6, nextPrice: 1 }, { ref: '', flag: 'FR', boost: 1, shot: 0 })
+    .catch((e) => e);
+  expect(err2.message).toMatch(/send at least \d+ugnot, got 1ugnot/);
+  expect(classifyError(err2).kind).toBe('realm');
 });
 
 test('create a pool, teams and old realms', async () => {

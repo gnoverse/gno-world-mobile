@@ -175,16 +175,16 @@ export class RealmSim {
   bid(addr: string, id: number, flag: string, sent: number): void {
     const p = this.pool(id);
     if (p.cancelled) throw new Error('pool was cancelled');
-    if (this.isOver(p)) throw new Error('pool is over');
-    if (sent < p.nextPrice) throw new Error(`price is ${p.nextPrice}ugnot, got ${sent}ugnot`);
+    if (this.isOver(p)) throw new Error('pool is closed');
+    if (sent < p.nextPrice) throw new Error(`send at least ${p.nextPrice}ugnot, got ${sent}ugnot`);
     this.apply(p, addr, flag || DEMO_COUNTRY, sent, this.now());
   }
 
-  claim(addr: string, id: number): void {
+  claim(_addr: string, id: number): void {
     const p = this.pool(id);
     if (!this.isOver(p)) throw new Error('pool is not over');
     if (p.paid) throw new Error(`nothing to claim: pool ${id} was already paid`);
-    void addr; // anyone may trigger the payout; the winner is credited
+    // anyone may trigger the payout; the winner is credited
     this.settle(p);
   }
 
