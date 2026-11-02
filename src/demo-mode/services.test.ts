@@ -9,6 +9,7 @@ import { isPlayBlocked, sendPresence } from '@/offchain/presence';
 import { fastCrypto, until } from '@/offchain/sync/testing';
 import { DEFAULT_GRANT } from '@/session/types';
 import type { Services } from '@/state/app-services';
+import { settingsStore } from '@/state/settings';
 import { decodeAddress } from '@/utils/bech32';
 
 import { DEMO_COUNTRY, DEMO_MASTER, DEMO_NAME, DEMO_PAIR_CODE, GUIDED_POOL_KEY } from './constants';
@@ -195,4 +196,18 @@ test('memory stores keep values in their map', async () => {
 test('sha256Hex is SHA-256', () => {
   for (const s of ['', 'abc', 'aaaaaaaaaaaaaaaa', 'é🫧'.repeat(40)])
     expect(sha256Hex(s)).toBe(createHash('sha256').update(s, 'utf8').digest('hex'));
+});
+
+test('the demo takes the settings chain ID, and writes no setting', async () => {
+  const before = settingsStore.getState();
+  settingsStore.setState({ chainId: 'dev' });
+  const set = jest.spyOn(settingsStore.getState(), 'setNetwork');
+  try {
+    const s = await demo();
+    expect(s.session.getState().active?.chainId).toBe('dev');
+    expect(s.net.current().chainId).toBe('dev');
+    expect(set).not.toHaveBeenCalled();
+  } finally {
+    settingsStore.setState({ chainId: before.chainId });
+  }
 });

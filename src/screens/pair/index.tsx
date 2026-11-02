@@ -26,7 +26,8 @@ const confirmPair = (paired: boolean) =>
     ], { cancelable: true, onDismiss: () => resolve(false) });
   });
 
-export function PairScreen({ store, identity }: { store: StoreApi<SyncState>; identity: ChatIdentity }) {
+/** `demoCode`: in demo mode, the code the simulated browser knows (the hint under the field) */
+export function PairScreen({ store, identity, demoCode }: { store: StoreApi<SyncState>; identity: ChatIdentity; demoCode?: string }) {
   const s = useStore(store);
   const [typed, setTyped] = useState('');
   const [outcome, setOutcome] = useState('');
@@ -97,6 +98,7 @@ export function PairScreen({ store, identity }: { store: StoreApi<SyncState>; id
           maxLength={7}
         />
         <Button title={s.busy === 'accept' ? 'Pairing…' : 'Pair'} disabled={!!s.busy || !typed.trim()} onPress={() => void pair()} />
+        {demoCode ? <Text style={styles.muted}>{`Demo: type ${demoCode}, or any six letters and digits.`}</Text> : null}
         {s.acceptError ? <Text style={styles.bad}>{s.acceptError}</Text> : null}
         {outcome ? <Text style={styles.text}>{outcome}</Text> : null}
       </Card>

@@ -28,7 +28,7 @@ import { GrantForm } from './grant-form';
 import { walletErrorText } from './wallet-error';
 
 export function SessionScreen() {
-  const { api } = useServices();
+  const { api, demo } = useServices();
   const chainId = useSettings((x) => x.chainId);
   const s = useSession((x) => x);
   const refresh = useSession((x) => x.refresh);
@@ -69,7 +69,23 @@ export function SessionScreen() {
     Alert.alert(title, message);
   }, [walletError, takeWalletError, chainId]);
 
-  const page = (body: ReactNode) => <Page style={styles.page}>{body}</Page>;
+  // demo mode: the "computer" that signs the pending request (it does nothing before one exists)
+  const [approving, setApproving] = useState(false);
+  const approve =
+    demo && s.pending ? (
+      <Button
+        kind="secondary" title="Approve on the simulated computer · demo" disabled={approving}
+        onPress={() => {
+          setApproving(true);
+          void demo.approvePending().catch(() => undefined).finally(() => setApproving(false));
+        }} />
+    ) : null;
+  const page = (body: ReactNode) => (
+    <Page style={styles.page}>
+      {body}
+      {approve}
+    </Page>
+  );
 
   if (s.phase === 'error') {
     const can = errorActions(s.error, !!s.active);

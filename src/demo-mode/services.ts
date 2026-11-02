@@ -12,6 +12,7 @@ import { createHomeChannels } from '@/screens/channels/home-channels';
 import type { Services } from '@/state/app-services';
 import { createChatServices } from '@/state/chat-services';
 import { createNetworkSync } from '@/state/network-sync';
+import { settingsStore } from '@/state/settings';
 
 import { DemoChain } from './chain/demo-chain';
 import { RealmSim } from './chain/realm-sim';
@@ -31,13 +32,14 @@ export interface DemoControls {
 }
 
 const SCOPE = 'demo://gno.world';
-const NETWORK = { chainId: 'gnoland-1', remote: 'demo://chain' };
 const START_BALANCE = 100_000_000; // ugnot: 100 GNOT
 /** the simulated chain answers at once: a short poll keeps approvals quick */
 const POLL_MS = 300;
 const SEEDED_KEY = 'br-session-demo';
 
 export function createDemoServices(o: { crypto?: CryptoBackend; now?: () => number } = {}): Services {
+  // the settings' network, read only: screens that compare the session's chain to the settings' agree
+  const NETWORK = { chainId: settingsStore.getState().chainId, remote: 'demo://chain' };
   const crypto = o.crypto ?? expoCrypto;
   const now = o.now ?? Date.now; // ms
   const seconds = () => Math.floor(now() / 1000);

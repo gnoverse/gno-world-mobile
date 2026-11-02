@@ -153,6 +153,14 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
         </Card>
       ) : null}
 
+      {demo && live ? (
+        <Button
+          kind="secondary" title="⏩ End now · demo"
+          onPress={() => {
+            demo.endNow(pool.key);
+            void reload();
+          }} />
+      ) : null}
       {closedUnpaid && active ? <Button title="claim" disabled={busy} onPress={() => run('claim', () => game.claim(active, pool))} /> : null}
       {canCancel ? <Button kind="danger" title="cancel this pool" disabled={busy} onPress={() => run('cancel', () => game.cancel(active!, pool))} /> : null}
       {msg ? <Text style={styles.msg}>{msg}</Text> : null}
