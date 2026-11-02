@@ -5,6 +5,7 @@ import { useStore as mockUseStore } from 'zustand';
 
 import { NO_IDENTITY } from '@/offchain/chat/identity';
 import { createIdentityState } from '@/offchain/chat/identity-store';
+import { line } from '@/offchain/chat/testing';
 import { NO_SUCH_ROOM } from '@/offchain/rooms/store';
 import { screenServices } from '@/screens/channels/testing';
 import { ChatScreen } from '@/screens/chat';
@@ -15,15 +16,16 @@ const X = 'XXXXXXXXXXXXXXXXXXXX';
 const mockParams: { identity?: string; room?: string } = {};
 let mockS: ReturnType<typeof screenServices>;
 let mockIdentity: ReturnType<typeof createIdentityState>;
+let mockDemo: object | null = null;
 
 jest.mock('expo-router', () => ({
   useFocusEffect: (cb: () => void | (() => void)) => mockUseEffect(cb, [cb]),
   useLocalSearchParams: () => mockParams,
-  router: { setParams: jest.fn(), push: jest.fn() },
+  router: { setParams: jest.fn(), push: jest.fn(), navigate: jest.fn() },
 }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('@/state/app-services', () => ({
-  useServices: () => ({ ...mockS, identity: mockIdentity, avatarUri: (id: string) => `http://fake/api/avatar/${id}.jpg` }),
+  useServices: () => ({ ...mockS, identity: mockIdentity, demo: mockDemo, avatarUri: (id: string) => `http://fake/api/avatar/${id}.jpg` }),
   useSession: <T,>(sel: (s: { active: null }) => T) => sel({ active: null }),
   useRooms: <T,>(sel: (s: ReturnType<typeof mockS.rooms.getState>) => T) => mockUseStore(mockS.rooms, sel),
   useChatChannel: <T,>(sel: (s: ReturnType<typeof mockS.chatChannel.getState>) => T) => mockUseStore(mockS.chatChannel, sel),
@@ -34,6 +36,8 @@ beforeEach(async () => {
   delete mockParams.room;
   jest.mocked(router.setParams).mockClear();
   jest.mocked(router.push).mockClear();
+  jest.mocked(router.navigate).mockClear();
+  mockDemo = null;
   mockS = screenServices({
     book: { rooms: [{ id: A, name: 'Dev chat', key: '', at: 1 }], left: {} },
     listed: [{ id: L, name: 'governance', here: 4, made: 1 }],
@@ -216,4 +220,29 @@ test('with the listing failing, a room param not joined is joined', async () => 
   await render(<ChatScreen />);
   await act(async () => undefined);
   expect(mockS.chatChannel.getState().current).toBe(X);
+});
+
+describe('a room link in a line', () => {
+  const link = `https://gno.world/#r/${X}`;
+  beforeEach(() => mockS.chat.setState({ phase: 'live', lines: [line(1, { name: 'sol', body: `join us: ${link}` })] }));
+
+  test('in demo, opens the room in the app', async () => {
+    mockDemo = {};
+    await render(<ChatScreen />);
+    await fireEvent.press(screen.getByText(link));
+    expect(router.navigate).toHaveBeenCalledWith({ pathname: '/chat', params: { room: X } });
+  });
+
+  test('in real mode, leaves it to the system', async () => {
+    const Linking = jest.requireActual<typeof import('expo-linking')>('expo-linking');
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    try {
+      await render(<ChatScreen />);
+      await fireEvent.press(screen.getByText(link));
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(open).toHaveBeenCalledWith(link);
+    } finally {
+      open.mockRestore();
+    }
+  });
 });

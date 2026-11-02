@@ -10,6 +10,7 @@ import { ChatFull } from '@/screens/home/full/chat-full';
 import { HereFull } from '@/screens/home/full/here-full';
 
 let mockS: ReturnType<typeof screenServices>;
+let mockDemo: object | null = null;
 const ROOM = 'AAAAAAAAAAAAAAAAAAAA';
 const LISTED = 'BBBBBBBBBBBBBBBBBBBB';
 let mockWhere: Record<string, unknown>;
@@ -25,7 +26,7 @@ jest.mock('expo-router', () => ({
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => mockInsets }));
 jest.mock('@/state/app-services', () => ({
-  useServices: () => ({ ...mockS, offchain: { get: mockGet }, avatarUri: (id: string) => `http://fake/api/avatar/${id}.jpg` }),
+  useServices: () => ({ ...mockS, demo: mockDemo, offchain: { get: mockGet }, avatarUri: (id: string) => `http://fake/api/avatar/${id}.jpg` }),
   useRooms: <T,>(sel: (s: ReturnType<typeof mockS.rooms.getState>) => T) => mockUseStore(mockS.rooms, sel),
   useHomeChannels: <T,>(sel: (s: ReturnType<typeof mockS.homeChannels.getState>) => T) => mockUseStore(mockS.homeChannels, sel),
 }));
@@ -103,6 +104,30 @@ describe('Chat, read only', () => {
     // an inverted list renders the newest first, which shows it at the bottom
     expect(screen.getAllByText(/^(gm|hi all)$/).map((t) => t.props.children)).toEqual([['hi all'], ['gm']]);
     expect(screen.queryByRole('button', { name: /❤️/ })).toBeNull();
+  });
+
+  test('in demo, a room link closes the card and opens the room in Chat; in real mode it leaves the app', async () => {
+    const link = `https://gno.world/#r/${LISTED}`;
+    mockS.chat.setState({ lines: [line(3, { name: 'sol', body: `join us: ${link}` })] });
+    const Linking = jest.requireActual<typeof import('expo-linking')>('expo-linking');
+    const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    try {
+      mockDemo = {};
+      const view = await render(<ChatFull />);
+      await fireEvent.press(screen.getByText(link));
+      expect(router.dismissTo).toHaveBeenCalledWith({ pathname: '/chat', params: { room: LISTED } });
+      expect(open).not.toHaveBeenCalled();
+      await view.unmount();
+      (router.dismissTo as jest.Mock).mockClear();
+      mockDemo = null;
+      await render(<ChatFull />);
+      await fireEvent.press(screen.getByText(link));
+      expect(open).toHaveBeenCalledWith(link);
+      expect(router.dismissTo).not.toHaveBeenCalled();
+    } finally {
+      open.mockRestore();
+      mockDemo = null;
+    }
   });
 
   test('reading here counts as seen', async () => {

@@ -17,10 +17,13 @@ import { ShowOnHome } from './show-on-home';
 
 const NO_REACTIONS: string[] = [];
 const nothing = () => {};
+/** Demo mode: the demo's rooms are not on the website, so a room link closes the card and opens the room in Chat. */
+const openRoomInChat = (id: string) => router.dismissTo({ pathname: '/chat', params: { room: id } });
 
 /** The chat to read: Home's channels, live, with nothing to write, react or vote with. */
 export function ChatFull() {
-  const { homeChannels, chatChannel, avatarUri } = useServices();
+  const { homeChannels, chatChannel, avatarUri, demo } = useServices();
+  const onRoomLink = demo ? openRoomInChat : undefined;
   const { channels, current, name, store: chat, select } = useHomeTabs();
   const [picking, setPicking] = useState(false);
   const s = useStore(chat);
@@ -47,9 +50,9 @@ export function ChatFull() {
     <ChatLineRow
       readOnly line={item} mine={isMine(item, s.you, s.mine)} now={now} avatarUri={avatarUri}
       myReactions={s.myReactions[item.id] ?? NO_REACTIONS} myVote={s.myVotes[item.id]}
-      onLongPress={nothing} onJump={jumpTo} onReact={nothing} onVote={nothing}
+      onLongPress={nothing} onJump={jumpTo} onReact={nothing} onVote={nothing} onRoomLink={onRoomLink}
     />
-  ), [s.you, s.mine, s.myReactions, s.myVotes, now, avatarUri, jumpTo]);
+  ), [s.you, s.mine, s.myReactions, s.myVotes, now, avatarUri, jumpTo, onRoomLink]);
 
   return (
     <View style={styles.root}>

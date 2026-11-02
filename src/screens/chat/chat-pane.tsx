@@ -20,7 +20,7 @@ import { Pins } from './pins';
 
 const NO_REACTIONS: string[] = [];
 
-export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityOpen, placeholder, canModerate, guided }: {
+export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityOpen, placeholder, canModerate, guided, onRoomLink }: {
   store: StoreApi<ChatState>; identity: StoreApi<IdentityState>; avatarUri: (id: string) => string; onOpenIdentity?: () => void;
   /** the name sheet is showing */
   identityOpen?: boolean;
@@ -29,6 +29,8 @@ export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityO
   canModerate?: boolean;
   /** the channel the demo's guide shows (Public): its newest line not written here is the React step's target */
   guided?: boolean;
+  /** a room link tapped in a line, to open here (demo mode); without it, links open outside the app */
+  onRoomLink?: (id: string) => void;
 }) {
   const s = useStore(store);
   const me = useStore(identity, (i) => i.identity);
@@ -71,11 +73,11 @@ export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityO
       <ChatLineRow
         line={item} mine={mine(item)} now={now} avatarUri={avatarUri}
         myReactions={s.myReactions[item.id] ?? NO_REACTIONS} myVote={s.myVotes[item.id]}
-        onLongPress={openMenu} onJump={jumpTo} onReact={react} onVote={vote}
+        onLongPress={openMenu} onJump={jumpTo} onReact={react} onVote={vote} onRoomLink={onRoomLink}
       />
     );
     return item.id === guideLine ? <GuideTarget id="chat.line">{row}</GuideTarget> : row;
-  }, [mine, now, avatarUri, s.myReactions, s.myVotes, openMenu, jumpTo, react, vote, guideLine]);
+  }, [mine, now, avatarUri, s.myReactions, s.myVotes, openMenu, jumpTo, react, vote, onRoomLink, guideLine]);
   const myName = me.reservedName || me.name;
   // the held-back line goes out when the sheet closes with a name (not as soon as one is saved: "Reserve" saves the
   // name, then reserves it — the line must carry the key); closing it without a name drops the line
