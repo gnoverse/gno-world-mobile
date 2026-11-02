@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Dimensions, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { AccessibilityInfo, Dimensions, Platform, StyleSheet } from 'react-native';
 
 import { space } from '@/theme';
 
@@ -123,4 +123,46 @@ test('renders nothing when demo is off', async () => {
   s().skip();
   await render(<GuideBubble />);
   expect(screen.toJSON()).toBeNull();
+});
+
+describe('VoiceOver', () => {
+  let announce: jest.SpyInstance;
+  let os: jest.ReplaceProperty<typeof Platform.OS>;
+  beforeEach(() => {
+    // react-native's jest setup makes it a mock already, which the earlier tests called
+    announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => undefined);
+    announce.mockClear();
+    os = jest.replaceProperty(Platform, 'OS', 'ios');
+  });
+  afterEach(() => {
+    announce.mockRestore();
+    os.restore();
+  });
+
+  test("hears the step's title and body when the step or its body changes, not on every render", async () => {
+    at(0);
+    const price = { 'home.price': { x: 0, y: 100, w: 300, h: 100 } };
+    targetsStore.setState({ rects: price });
+    await render(<GuideBubble />);
+    expect(announce.mock.calls).toEqual([[`${STEPS[0].title}. ${STEPS[0].body}`]]);
+    // the target moves: same words, nothing said again
+    await act(() => targetsStore.setState({ rects: { 'home.price': { x: 0, y: 120, w: 300, h: 100 } } }));
+    expect(announce).toHaveBeenCalledTimes(1);
+    // the target leaves the screen: the body says where to go
+    await act(() => targetsStore.setState({ rects: {} }));
+    expect(announce).toHaveBeenLastCalledWith(`${STEPS[0].title}. Open Home to continue.`);
+    // the next step
+    await act(() => s().next());
+    expect(announce).toHaveBeenLastCalledWith(`${STEPS[1].title}. Open Home to continue.`);
+    expect(announce).toHaveBeenCalledTimes(3);
+  });
+
+  test('nothing is said outside the guide, nor on Android (its live region speaks)', async () => {
+    await render(<GuideBubble />);
+    expect(announce).not.toHaveBeenCalled();
+    os.replaceValue('android');
+    at(0);
+    await render(<GuideBubble />);
+    expect(announce).not.toHaveBeenCalled();
+  });
 });

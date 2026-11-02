@@ -1,6 +1,6 @@
 import { useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from 'zustand';
 
@@ -38,18 +38,26 @@ export function GuideBubble() {
   const first: string | undefined = useSegments()[0];
   const tabBar = !first || first === '(tabs)';
   const st = on && step !== null ? STEPS[step] : undefined;
+
+  const hit = st?.targets.find((id) => rects[id]);
+  const via = st && !hit && tabBar && st.via && rects[st.via] ? rects[st.via] : undefined;
+  const body = !st
+    ? ''
+    : hit
+      ? st.body
+      : via
+        ? 'Open this pool to continue.'
+        : tabBar
+          ? `Open ${TAB_LABELS[st.tab]} to continue.`
+          : `Go back, then open ${TAB_LABELS[st.tab]}.`;
+  // VoiceOver hears a new step, or new words for it (Android's live region on the body speaks there)
+  const spoken = st ? `${st.title}. ${body}` : '';
+  useEffect(() => {
+    if (spoken && Platform.OS === 'ios') AccessibilityInfo.announceForAccessibility(spoken);
+  }, [spoken]);
   if (!st || step === null) return null;
 
-  const hit = st.targets.find((id) => rects[id]);
-  const via = !hit && tabBar && st.via && rects[st.via] ? rects[st.via] : undefined;
   const anchor = hit ? rects[hit] : via ?? (tabBar ? rects[`tab.${st.tab}`] : undefined);
-  const body = hit
-    ? st.body
-    : via
-      ? 'Open this pool to continue.'
-      : tabBar
-        ? `Open ${TAB_LABELS[st.tab]} to continue.`
-        : `Go back, then open ${TAB_LABELS[st.tab]}.`;
   const last = step === STEPS.length - 1;
 
   const bw = Math.min(width - 2 * space.l, MAX_WIDTH);
