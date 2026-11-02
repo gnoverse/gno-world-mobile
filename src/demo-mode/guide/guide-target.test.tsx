@@ -1,4 +1,7 @@
 import { act, render, screen } from '@testing-library/react-native';
+import { NavigationContext } from 'expo-router/react-navigation';
+import { isRenderingComponent } from 'expo-router/build/react-navigation/core/isRenderingComponent';
+import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { demoStore } from '../store';
@@ -53,4 +56,48 @@ test('unmounting forgets it', async () => {
   expect(Object.keys(rects())).toEqual(['home.price']);
   await screen.unmount();
   expect(rects()).toEqual({});
+});
+
+/** a screen's navigation, as React Navigation gives it; it counts the times it is asked while React renders, which
+ *  React Navigation warns about (a stale answer) */
+function fakeScreen(focused: boolean) {
+  const subs: Record<string, Set<() => void>> = { focus: new Set(), blur: new Set() };
+  const nav = {
+    focused, askedInRender: 0,
+    isFocused() {
+      if (isRenderingComponent()) nav.askedInRender++;
+      return nav.focused;
+    },
+    addListener(type: 'focus' | 'blur', cb: () => void) {
+      subs[type].add(cb);
+      return () => subs[type].delete(cb);
+    },
+    async go(to: boolean) {
+      nav.focused = to;
+      await act(() => subs[to ? 'focus' : 'blur'].forEach((cb) => cb()));
+    },
+  };
+  const In = ({ children }: { children: ReactNode }) => <NavigationContext.Provider value={nav as never}>{children}</NavigationContext.Provider>;
+  return { nav, In };
+}
+
+test('in a screen not shown, it waits until the screen is shown, and is forgotten when it is left', async () => {
+  s().enter();
+  const { nav, In } = fakeScreen(false);
+  await render(<In><GuideTarget id="home.price"><Text>price</Text></GuideTarget></In>);
+  expect(rects()).toEqual({});
+  await nav.go(true);
+  expect(Object.keys(rects())).toEqual(['home.price']);
+  await nav.go(false);
+  expect(rects()).toEqual({});
+  expect(nav.askedInRender).toBe(0);
+});
+
+test("a tab button sits in its own tab's navigation: it is measured whichever tab is shown", async () => {
+  s().enter();
+  for (let i = 0; i < 2; i++) s().next(); // Say hello, seen from Home: its tab is Chat's
+  const { nav, In } = fakeScreen(false);
+  await render(<In><GuideTarget id="tab.chat" anyScreen><Text>Chat</Text></GuideTarget></In>);
+  expect(Object.keys(rects())).toEqual(['tab.chat']);
+  expect(nav.askedInRender).toBe(0);
 });

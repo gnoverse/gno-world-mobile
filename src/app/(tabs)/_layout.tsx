@@ -24,7 +24,7 @@ const tabButton = (route: string) => {
   if (!b) {
     b = function TabButton(props: BottomTabBarButtonProps) {
       return (
-        <GuideTarget id={`tab.${route}`} style={styles.tab}>
+        <GuideTarget id={`tab.${route}`} anyScreen style={styles.tab}>
           <PlatformPressable {...props} />
         </GuideTarget>
       );
