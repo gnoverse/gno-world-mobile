@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, radius, space } from '@/theme';
@@ -13,14 +13,18 @@ const H = 12;
 /** between its bottom and the safe area's */
 const GAP = 1;
 
-/** "DEMO", centred in the top safe area above every screen, its bottom just above the inset so it hides no header
- *  control; a tap offers to leave. */
+/** where the badge's top goes. iOS: in the top safe area, its bottom just above the inset, so it hides no header
+ *  control. Android: just below the inset, because the system's status bar takes every touch in its strip (a badge
+ *  there cannot be tapped) and a centred notch would hide it; the header's centre is empty there. */
+const badgeTop = (insetTop: number) => (Platform.OS === 'android' ? insetTop + GAP : Math.max(0, insetTop - H - GAP));
+
+/** "DEMO", centred at the top of every screen (see badgeTop); a tap offers to leave. */
 export function DemoBadge() {
   const on = useDemo((s) => s.on);
   const insets = useSafeAreaInsets();
   if (!on) return null;
   return (
-    <View testID="demo-badge" style={[styles.row, { top: Math.max(0, insets.top - H - GAP) }]}>
+    <View testID="demo-badge" style={[styles.row, { top: badgeTop(insets.top) }]}>
       <GuideTarget id="demo.badge">
         <Pressable
           accessibilityRole="button"

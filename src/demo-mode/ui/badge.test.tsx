@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { Alert, StyleSheet, type AlertButton } from 'react-native';
+import { Alert, Platform, StyleSheet, type AlertButton } from 'react-native';
 
 import { demoStore } from '@/demo-mode/store';
 
@@ -39,7 +39,8 @@ test('leaving asks first', async () => {
   expect(mockReplace).toHaveBeenCalledWith('/');
 });
 
-test('centred in the top safe area, above the header row, small enough for it', async () => {
+test('on iOS, centred in the top safe area, above the header row, small enough for it', async () => {
+  const os = jest.replaceProperty(Platform, 'OS', 'ios');
   demoStore.getState().enter();
   await render(<DemoBadge />);
   const row = StyleSheet.flatten(screen.getByTestId('demo-badge').props.style);
@@ -55,4 +56,21 @@ test('centred in the top safe area, above the header row, small enough for it', 
   mockTop = 0;
   await render(<DemoBadge />);
   expect(StyleSheet.flatten(screen.getByTestId('demo-badge').props.style).top).toBe(0);
+  os.restore();
+});
+
+test('on Android, just below the status bar, whose strip takes every touch: centred, the same small badge', async () => {
+  const os = jest.replaceProperty(Platform, 'OS', 'android');
+  demoStore.getState().enter();
+  await render(<DemoBadge />);
+  const row = StyleSheet.flatten(screen.getByTestId('demo-badge').props.style);
+  const badge = StyleSheet.flatten(screen.getByLabelText('Demo mode — tap to leave').props.style);
+  expect(row).toMatchObject({ position: 'absolute', left: 0, right: 0, alignItems: 'center' });
+  expect(badge.height).toBeLessThanOrEqual(14);
+  // its top under the inset (the status bar), never inside it
+  expect(row.top).toBe(20 + 1);
+  mockTop = 0;
+  await render(<DemoBadge />);
+  expect(StyleSheet.flatten(screen.getByTestId('demo-badge').props.style).top).toBe(1);
+  os.restore();
 });
