@@ -32,7 +32,7 @@ function make(identity: ChatIdentity, client: Partial<ChatClient> = {}) {
 test('a free name is saved; reserving needs a session', async () => {
   const store = make(NO_IDENTITY);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="" />);
   await fireEvent.changeText(screen.getByLabelText('name'), 'ann');
   await fireEvent.press(screen.getByText('Save name'));
   await waitFor(() => expect(store.getState().identity.name).toBe('ann'));
@@ -46,7 +46,7 @@ test('reserving shows the mark, and the server\'s refusal as is', async () => {
     .mockResolvedValueOnce({ name: 'ann', key: 'k', addr: 'g1x' });
   const store = make({ ...NO_IDENTITY, name: 'ann' }, { reserveName } as Partial<ChatClient>);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="g1x" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="g1x" />);
   await fireEvent.press(screen.getByText('Reserve this name'));
   expect(await screen.findByText('boop once from this app first')).toBeTruthy();
   await fireEvent.press(screen.getByText('Reserve this name'));
@@ -58,7 +58,7 @@ test('a name the server wants signed, without a wallet: coming soon, and how to 
   const reserveName = jest.fn().mockRejectedValueOnce(new OffchainError(409, 'Connect your wallet and let it sign the phrase'));
   const store = make({ ...NO_IDENTITY, name: 'ann' }, { reserveName } as Partial<ChatClient>);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="g1x" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="g1x" />);
   await fireEvent.press(screen.getByText('Reserve this name'));
   expect(await screen.findByText('Coming soon')).toBeTruthy();
   expect(screen.getByText(/Proving this name with a signature comes with gnokey mobile/)).toBeTruthy();
@@ -70,7 +70,7 @@ test('without a wallet, the hint does not offer the wallet\'s signature', async 
   mockBuild.walletEnabled = false;
   const store = make({ ...NO_IDENTITY, name: 'ann' });
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="g1x" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="g1x" />);
   expect(screen.getByText(/Boop from this app, then reserve within 3 minutes/)).toBeTruthy();
   expect(screen.queryByText(/Your wallet signs a phrase/)).toBeNull();
   mockBuild.walletEnabled = true;
@@ -82,7 +82,7 @@ test('on Android the sheet rises above the keyboard itself (edge-to-edge: the wi
   const kav = jest.spyOn(KeyboardAvoidingView.prototype, 'render');
   const store = make(NO_IDENTITY);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="" />);
   expect((kav.mock.contexts.at(-1) as KeyboardAvoidingView).props.behavior).toBe('padding');
   kav.mockRestore();
   os.restore();
@@ -94,7 +94,7 @@ test('the library opens without asking for photo access (a refusal does not bloc
   picker.launchImageLibraryAsync.mockClear();
   const store = make(NO_IDENTITY);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="" />);
   await fireEvent.press(screen.getByText('Choose a photo'));
   await waitFor(() => expect(picker.launchImageLibraryAsync).toHaveBeenCalledTimes(1));
 });
@@ -105,7 +105,7 @@ test('a picker that fails says so and leaves the sheet usable', async () => {
   picker.launchImageLibraryAsync.mockRejectedValueOnce(new Error('iCloud said no')).mockResolvedValue({ canceled: true, assets: null });
   const store = make(NO_IDENTITY);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="" />);
   await fireEvent.press(screen.getByText('Choose a photo'));
   expect(await screen.findByText('That picture could not be read — try another one.')).toBeTruthy();
   await fireEvent.press(screen.getByText('Choose a photo'));
@@ -118,7 +118,7 @@ test('the sheet shows its error, and closing it clears it', async () => {
   await store.ready;
   store.setState({ identityError: 'the sheet\'s trouble' });
   const onClose = jest.fn();
-  await render(<IdentitySheet store={store} visible onClose={onClose} offchainUrl="http://fake" identity="" />);
+  await render(<IdentitySheet store={store} visible onClose={onClose} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="" />);
   expect(screen.getByText('the sheet\'s trouble')).toBeTruthy();
   await fireEvent.press(screen.getByText('Done'));
   expect(onClose).toHaveBeenCalled();
@@ -128,7 +128,7 @@ test('the sheet shows its error, and closing it clears it', async () => {
 test('"anon" is proposed and can be saved as is', async () => {
   const store = make(NO_IDENTITY);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="" />);
   expect(screen.getByLabelText('name').props.value).toBe('anon');
   await fireEvent.press(screen.getByText('Save name'));
   await waitFor(() => expect(store.getState().identity.name).toBe('anon'));
@@ -141,7 +141,7 @@ test('a picked photo is sent as the small JPEG', async () => {
   const uploadAvatar = jest.fn(async () => ({ id: 'abcdefgh', key: 'k' }));
   const store = make(NO_IDENTITY, { uploadAvatar } as Partial<ChatClient>);
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="" />);
   await fireEvent.press(screen.getByText('Choose a photo'));
   await waitFor(() => expect(uploadAvatar).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]), 'image/jpeg'));
 });
@@ -158,7 +158,7 @@ test('while the wallet signs, the sheet waits for it, and Cancel stops waiting',
     wallet: { open: async (u) => void opened.push(u), randomHex: () => 'ab', network: () => ({ chainId: 'dev', remote: '' }) },
   });
   await store.ready;
-  await render(<IdentitySheet store={store} visible onClose={() => undefined} offchainUrl="http://fake" identity="g1x" />);
+  await render(<IdentitySheet store={store} visible onClose={() => undefined} avatarUri={(id) => `http://fake/api/avatar/${id}.jpg`} identity="g1x" />);
   await fireEvent.press(screen.getByText('Reserve this name'));
   expect(await screen.findByText('Waiting for your wallet…')).toBeTruthy();
   expect(reserveName).toHaveBeenCalledWith('ann', 'g1x');

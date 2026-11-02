@@ -10,7 +10,6 @@ import { ChannelTabs } from '@/screens/channels/channel-tabs';
 import { useHomeTabs } from '@/screens/channels/use-home-tabs';
 import { ChatLineRow } from '@/screens/chat/chat-line';
 import { useServices } from '@/state/app-services';
-import { useSettings } from '@/state/settings';
 import { colors, space } from '@/theme';
 
 import { FullHeader, useBottomGap } from './full-header';
@@ -21,11 +20,10 @@ const nothing = () => {};
 
 /** The chat to read: Home's channels, live, with nothing to write, react or vote with. */
 export function ChatFull() {
-  const { homeChannels, chatChannel } = useServices();
+  const { homeChannels, chatChannel, avatarUri } = useServices();
   const { channels, current, name, store: chat, select } = useHomeTabs();
   const [picking, setPicking] = useState(false);
   const s = useStore(chat);
-  const offchainUrl = useSettings((st) => st.offchainUrl);
   const now = useNow(15000);
   const bottom = useBottomGap();
   const list = useRef<FlatList<ChatLine>>(null);
@@ -47,11 +45,11 @@ export function ChatFull() {
   }, [chat]);
   const renderItem = useCallback(({ item }: { item: ChatLine }) => (
     <ChatLineRow
-      readOnly line={item} mine={isMine(item, s.you, s.mine)} now={now} offchainUrl={offchainUrl}
+      readOnly line={item} mine={isMine(item, s.you, s.mine)} now={now} avatarUri={avatarUri}
       myReactions={s.myReactions[item.id] ?? NO_REACTIONS} myVote={s.myVotes[item.id]}
       onLongPress={nothing} onJump={jumpTo} onReact={nothing} onVote={nothing}
     />
-  ), [s.you, s.mine, s.myReactions, s.myVotes, now, offchainUrl, jumpTo]);
+  ), [s.you, s.mine, s.myReactions, s.myVotes, now, avatarUri, jumpTo]);
 
   return (
     <View style={styles.root}>

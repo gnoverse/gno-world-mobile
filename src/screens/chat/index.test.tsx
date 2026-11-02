@@ -23,7 +23,7 @@ jest.mock('expo-router', () => ({
 }));
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) }));
 jest.mock('@/state/app-services', () => ({
-  useServices: () => ({ ...mockS, identity: mockIdentity }),
+  useServices: () => ({ ...mockS, identity: mockIdentity, avatarUri: (id: string) => `http://fake/api/avatar/${id}.jpg` }),
   useSession: <T,>(sel: (s: { active: null }) => T) => sel({ active: null }),
   useRooms: <T,>(sel: (s: ReturnType<typeof mockS.rooms.getState>) => T) => mockUseStore(mockS.rooms, sel),
   useChatChannel: <T,>(sel: (s: ReturnType<typeof mockS.chatChannel.getState>) => T) => mockUseStore(mockS.chatChannel, sel),

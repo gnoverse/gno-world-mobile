@@ -10,15 +10,13 @@ import { useRoomOnScreen } from '@/screens/channels/use-room-on-screen';
 import { Banner } from '@/screens/rooms/banner';
 import { RoomMenu } from '@/screens/rooms/room-menu';
 import { useChatChannel, useRooms, useServices, useSession } from '@/state/app-services';
-import { useSettings } from '@/state/settings';
 
 import { ChatHeader } from './chat-header';
 import { ChatPane } from './chat-pane';
 import { IdentitySheet } from './identity-sheet';
 
 export function ChatScreen() {
-  const { rooms, chatChannel, identity } = useServices();
-  const offchainUrl = useSettings((s) => s.offchainUrl);
+  const { rooms, chatChannel, identity, avatarUri } = useServices();
   const active = useSession((s) => s.active);
   const current = useChatChannel((s) => s.current);
   const book = useRooms((s) => s.book);
@@ -107,10 +105,10 @@ export function ChatScreen() {
       {/* one per channel: a reply, an edit or a draft names lines of that room only */}
       <ChatPane
         key={current}
-        store={store} identity={identity} offchainUrl={offchainUrl} onOpenIdentity={() => setSheet(true)} identityOpen={sheet}
+        store={store} identity={identity} avatarUri={avatarUri} onOpenIdentity={() => setSheet(true)} identityOpen={sheet}
         placeholder={`say something in ${name}`} canModerate={!!current && !!rooms.getState().keyOf(current)}
       />
-      <IdentitySheet store={identity} visible={sheet} onClose={() => setSheet(false)} offchainUrl={offchainUrl} identity={active?.master ?? ''} />
+      <IdentitySheet store={identity} visible={sheet} onClose={() => setSheet(false)} avatarUri={avatarUri} identity={active?.master ?? ''} />
       <RoomMenu id={current} visible={menu} onClose={() => setMenu(false)} onLeft={() => chatChannel.getState().select('')} />
     </View>
   );

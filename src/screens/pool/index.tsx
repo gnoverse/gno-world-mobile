@@ -29,7 +29,7 @@ import { createTxRunner } from './tx-runner';
 
 export function PoolScreen({ poolKey }: { poolKey: string }) {
   const k = useMemo(() => parsePoolKey(poolKey), [poolKey]);
-  const { game, chatClient } = useServices();
+  const { game, chatClient, demo } = useServices();
   const active = useSession((s) => s.active);
   const status = useSession((s) => s.status);
   const refresh = useSession((s) => s.refresh);
@@ -96,7 +96,7 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
         setPool(fresh);
         return stale;
       }
-      if (c.flag) settingsStore.getState().setFlag(c.flag);
+      if (c.flag && !demo) settingsStore.getState().setFlag(c.flag); // demo mode writes no settings
       await game.bid(active!, pool, { ref: effectiveRef, flag: c.flag, boost: c.boost, shot: c.shot });
       // as the site does: the off-chain server ties this client to the account that booped (name reservation)
       void reportBoop({

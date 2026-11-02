@@ -18,8 +18,8 @@ import { Pins } from './pins';
 
 const NO_REACTIONS: string[] = [];
 
-export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, identityOpen, placeholder, canModerate }: {
-  store: StoreApi<ChatState>; identity: StoreApi<IdentityState>; offchainUrl: string; onOpenIdentity?: () => void;
+export function ChatPane({ store, identity, avatarUri, onOpenIdentity, identityOpen, placeholder, canModerate }: {
+  store: StoreApi<ChatState>; identity: StoreApi<IdentityState>; avatarUri: (id: string) => string; onOpenIdentity?: () => void;
   /** the name sheet is showing */
   identityOpen?: boolean;
   placeholder?: string;
@@ -59,11 +59,11 @@ export function ChatPane({ store, identity, offchainUrl, onOpenIdentity, identit
   }, [store]);
   const renderItem = useCallback(({ item }: { item: ChatLine }) => (
     <ChatLineRow
-      line={item} mine={mine(item)} now={now} offchainUrl={offchainUrl}
+      line={item} mine={mine(item)} now={now} avatarUri={avatarUri}
       myReactions={s.myReactions[item.id] ?? NO_REACTIONS} myVote={s.myVotes[item.id]}
       onLongPress={openMenu} onJump={jumpTo} onReact={react} onVote={vote}
     />
-  ), [mine, now, offchainUrl, s.myReactions, s.myVotes, openMenu, jumpTo, react, vote]);
+  ), [mine, now, avatarUri, s.myReactions, s.myVotes, openMenu, jumpTo, react, vote]);
   const myName = me.reservedName || me.name;
   // the held-back line goes out when the sheet closes with a name (not as soon as one is saved: "Reserve" saves the
   // name, then reserves it — the line must carry the key); closing it without a name drops the line

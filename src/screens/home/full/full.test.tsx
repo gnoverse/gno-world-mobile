@@ -25,7 +25,7 @@ jest.mock('expo-router', () => ({
 const mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => mockInsets }));
 jest.mock('@/state/app-services', () => ({
-  useServices: () => ({ ...mockS, offchain: { get: mockGet } }),
+  useServices: () => ({ ...mockS, offchain: { get: mockGet }, avatarUri: (id: string) => `http://fake/api/avatar/${id}.jpg` }),
   useRooms: <T,>(sel: (s: ReturnType<typeof mockS.rooms.getState>) => T) => mockUseStore(mockS.rooms, sel),
   useHomeChannels: <T,>(sel: (s: ReturnType<typeof mockS.homeChannels.getState>) => T) => mockUseStore(mockS.homeChannels, sel),
 }));

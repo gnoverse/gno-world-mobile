@@ -1,19 +1,20 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useGnoNativeContext } from '@gnolang/gnonative';
 import * as Linking from 'expo-linking';
-import { createContext, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
+import { createContext, Fragment, useContext, useEffect, useLayoutEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { AppState } from 'react-native';
 import { useStore, type StoreApi } from 'zustand';
 
 import type { ChainApi } from '@/chain/api';
 import { GameClient } from '@/chain/game-client';
-import type { DemoControls } from '@/demo-mode/services';
+import { createDemoServices, type DemoControls } from '@/demo-mode/services';
+import { useDemo } from '@/demo-mode/store';
 import { avatarUrl, type ChatClient } from '@/offchain/chat/client';
 import { followAppState } from '@/offchain/chat/app-state';
 import type { IdentityState } from '@/offchain/chat/identity-store';
 import type { ChatState } from '@/offchain/chat/store';
 import { browserId, createOffchain, type Offchain } from '@/offchain/http';
-import { presenceStore, sendPresence } from '@/offchain/presence';
+import { presenceStore, resetPresence, sendPresence } from '@/offchain/presence';
 import type { RoomsState } from '@/offchain/rooms/store';
 import { expoCrypto } from '@/offchain/sync/expo-crypto';
 import type { SyncState } from '@/offchain/sync/store';
@@ -102,39 +103,56 @@ export function AppServices({ children }: PropsWithChildren) {
   const { gnonative } = useGnoNativeContext();
   const api: ChainApi = gnonative; // GnoNativeApi satisfies ChainApi (guarded by gnoNativeSatisfiesChainApi in src/chain/api.ts)
 
-  const services = useMemo<Services>(() => createRealServices(api), [api]);
-
-  // follow network switches from Settings: gnonative first, then the session store
-  useEffect(
-    () =>
-      settingsStore.subscribe((now, before) => {
-        if (now.chainId !== before.chainId || now.remote !== before.remote)
-          void services.net.set({ chainId: now.chainId, remote: now.remote });
-      }),
-    [services],
+  // demo mode: the same services over an in-memory world; each switch (and each restart of the demo) builds a new set,
+  // so nothing one set does lands in another's stores; the real set reads the phone's storage again
+  const on = useDemo((s) => s.on);
+  const epoch = useDemo((s) => s.epoch);
+  const services = useMemo<Services>(
+    () => (on ? createDemoServices() : createRealServices(api)),
+    // `epoch` is not read: it is what asks for a new set (a switch, a restart of the demo)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [api, on, epoch],
   );
+  const real = !services.demo;
 
-  // resume a pending session request / re-unlock the active key on launch
+  // the presence shown was the other world's
+  useLayoutEffect(() => resetPresence(), [services]);
+
+  // follow network switches from Settings: gnonative first, then the session store (Settings stay the real app's)
+  useEffect(() => {
+    if (!real) return;
+    return settingsStore.subscribe((now, before) => {
+      if (now.chainId !== before.chainId || now.remote !== before.remote)
+        void services.net.set({ chainId: now.chainId, remote: now.remote });
+    });
+  }, [services, real]);
+
+  // resume a pending session request / re-unlock the active key on launch (and on coming back from demo mode)
   useEffect(() => {
     let done = false;
     // `ready`, not `persist`: it settles even when the storage could not be read
-    return watchHydration(services.session.ready, () => {
+    const unwatch = watchHydration(services.session.ready, () => {
       if (done) return;
       done = true;
       void services.session.getState().restore().catch(() => undefined);
     });
+    return () => {
+      unwatch();
+      services.session.getState().pause(); // a set left behind stops reading its chain
+    };
   }, [services]);
 
   // presence heartbeat: every 20 s while in the foreground
   const [pid] = useState(() => randomHex(8));
   useEffect(() => {
     let timer: ReturnType<typeof setInterval> | undefined;
+    let gone = false; // a beat answered after a switch is the other world's
     const beat = async () => {
       try {
         const r = await sendPresence(services.offchain, pid, services.sync.getState().group);
-        presenceStore.getState().update({ country: r.you, count: r.count, reachable: true });
+        if (!gone) presenceStore.getState().update({ country: r.you, count: r.count, reachable: true });
       } catch {
-        presenceStore.getState().update({ reachable: false }); // play stays open
+        if (!gone) presenceStore.getState().update({ reachable: false }); // play stays open
       }
     };
     const stop = () => {
@@ -149,6 +167,7 @@ export function AppServices({ children }: PropsWithChildren) {
     if (AppState.currentState === 'active') start();
     const sub = AppState.addEventListener('change', (st) => (st === 'active' ? start() : stop()));
     return () => {
+      gone = true;
       stop();
       sub.remove();
     };
@@ -172,7 +191,7 @@ export function AppServices({ children }: PropsWithChildren) {
     if (AppState.currentState === 'active') lifecycle.start();
     const sub = AppState.addEventListener('change', (st) => followAppState(st, lifecycle));
     const unsub = settingsStore.subscribe((now, before) => {
-      if (now.offchainUrl !== before.offchainUrl) {
+      if (real && now.offchainUrl !== before.offchainUrl) {
         services.identity.getState().restart();
         chat().restart();
         rooms().restart();
@@ -185,7 +204,7 @@ export function AppServices({ children }: PropsWithChildren) {
       unsub();
       lifecycle.stop();
     };
-  }, [services]);
+  }, [services, real]);
 
   // /pair sync: in the foreground ("inactive" keeps it, as the chat), from scratch when the server changes; a name
   // reserved, proven or released here goes out to the paired devices
@@ -195,7 +214,7 @@ export function AppServices({ children }: PropsWithChildren) {
     if (AppState.currentState === 'active') sync().resume();
     const sub = AppState.addEventListener('change', (st) => followAppState(st, lifecycle));
     const unsubUrl = settingsStore.subscribe((now, before) => {
-      if (now.offchainUrl !== before.offchainUrl) sync().restart();
+      if (real && now.offchainUrl !== before.offchainUrl) sync().restart();
     });
     const unsubName = services.identity.subscribe((now, before) => {
       if (now.identity.reservedName !== before.identity.reservedName || now.identity.nameKey !== before.identity.nameKey) sync().changed();
@@ -206,9 +225,14 @@ export function AppServices({ children }: PropsWithChildren) {
       unsubName();
       sync().pause();
     };
-  }, [services]);
+  }, [services, real]);
 
-  return <Ctx.Provider value={services}>{children}</Ctx.Provider>;
+  // keyed: a switch remounts every screen, so none keeps state from the other world
+  return (
+    <Ctx.Provider value={services}>
+      <Fragment key={epoch}>{children}</Fragment>
+    </Ctx.Provider>
+  );
 }
 
 export function useServices(): Services {

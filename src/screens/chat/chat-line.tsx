@@ -2,7 +2,6 @@ import * as Linking from 'expo-linking';
 import { memo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { avatarUrl } from '@/offchain/chat/client';
 import type { ChatLine } from '@/offchain/chat/types';
 import { colors, radius, space } from '@/theme';
 import { flagEmoji } from '@/utils/flag';
@@ -10,8 +9,10 @@ import { flagEmoji } from '@/utils/flag';
 import { ago, placeholder, pollBars, rxWho, splitLinks } from './line-model';
 
 /** Memoised: a row renders again only when its line, its marks, the clock or a handler changes. */
-export const ChatLineRow = memo(function ChatLineRow({ line, mine, now, offchainUrl, myReactions, myVote, onLongPress, onJump, onReact, onVote, readOnly }: {
-  line: ChatLine; mine: boolean; now: number; offchainUrl: string; myReactions: string[]; myVote: number | undefined;
+export const ChatLineRow = memo(function ChatLineRow({ line, mine, now, avatarUri, myReactions, myVote, onLongPress, onJump, onReact, onVote, readOnly }: {
+  line: ChatLine; mine: boolean; now: number; myReactions: string[]; myVote: number | undefined;
+  /** an avatar id's image URI (the server's, or the demo world's) */
+  avatarUri: (id: string) => string;
   onLongPress: (l: ChatLine) => void; onJump: (id: number) => void; onReact: (l: ChatLine, emoji: string) => void;
   onVote: (l: ChatLine, opt: number) => void;
   /** to read only (Home's full-screen chat): no menu, no reacting, no voting; links and the quote jump still work */
@@ -23,7 +24,7 @@ export const ChatLineRow = memo(function ChatLineRow({ line, mine, now, offchain
   return (
     // not one accessible element: poll options, reactions and links stay reachable on their own
     <Pressable onLongPress={readOnly ? undefined : () => onLongPress(line)} delayLongPress={300} accessible={false} style={[styles.row, mine && styles.mine]}>
-      {line.av ? <Image source={{ uri: avatarUrl(offchainUrl, line.av) }} style={styles.av} /> : <View style={styles.av} />}
+      {line.av ? <Image source={{ uri: avatarUri(line.av) }} style={styles.av} /> : <View style={styles.av} />}
       <View style={styles.main}>
         {/* the row is not one accessible element: its menu is an accessibility action on the name line */}
         <Text style={styles.who} numberOfLines={1} accessible
