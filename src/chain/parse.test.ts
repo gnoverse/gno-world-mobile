@@ -82,14 +82,21 @@ test("poolValueExpr copies each version's pool and asks its methods for what its
   p := *o
   p.LastBidAt, p.FirstBidAt, p.CreatedAt, p.PoppedAt = o.LastBidAt, o.FirstBidAt, o.CreatedAt, o.PoppedAt
   p.History = make([]Entry, len(o.History))
-  for i := range o.History { p.History[i] = o.History[i]; p.History[i].At = o.History[i].At }
-  p.Roster = make([]*Member, len(o.Roster))
-  for i, x := range o.Roster { c := *x; p.Roster[i] = &c }
-  p.Shots = make([]*Shot, len(o.Shots))
-  for i, x := range o.Shots { c := *x; p.Shots[i] = &c }
-  return struct{ Pool Pool; NextPrice int64; Deadline string; Over bool; ShotDelay int64; ShotWindow int64 }{
-    p, o.NextPrice(), unix(o.Deadline()), o.Over(), ShotDelay, ShotWindow,
+  for i := range o.History {
+    p.History[i] = o.History[i]
+    p.History[i].At = o.History[i].At
   }
+  p.Roster = make([]*Member, len(o.Roster))
+  for i, x := range o.Roster {
+    c := *x
+    p.Roster[i] = &c
+  }
+  p.Shots = make([]*Shot, len(o.Shots))
+  for i, x := range o.Shots {
+    c := *x
+    p.Shots[i] = &c
+  }
+  return struct{ Pool Pool; NextPrice int64; Deadline string; Over bool; ShotDelay int64; ShotWindow int64 } { p, o.NextPrice(), unix(o.Deadline()), o.Over(), ShotDelay, ShotWindow }
 }()`);
   expect(poolValueExpr(4, 1)).toMatch(/LastDay string; LiveBps int64; ShotDelay int64; ShotWindow int64 }/);
   expect(poolValueExpr(3, 1)).toMatch(/Over bool; LastDay string; LiveBps int64 }.*p\.Shots = /s);

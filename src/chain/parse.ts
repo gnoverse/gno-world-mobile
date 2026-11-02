@@ -126,8 +126,12 @@ export function parseRealm(raw: string, v: Version): RealmInfo {
 export const parsePool = (raw: string, v: Version): Pool => toPool(load(raw, `pool v${v}`), v);
 
 /** poolValueExpr's Go for a list of pointers: point each element of the copy `p`'s list at a copy of the stored `o`'s. */
-function copyPointers(list: string, type: string): string[] {
-  return [`p.${list} = make([]*${type}, len(o.${list}))`, `for i, x := range o.${list} { c := *x; p.${list}[i] = &c }`];
+function copyPointers(list: string, type: string): string {
+  return `p.${list} = make([]*${type}, len(o.${list}))
+  for i, x := range o.${list} {
+    c := *x
+    p.${list}[i] = &c
+  }`;
 }
 
 /**
@@ -151,19 +155,21 @@ export function poolValueExpr(v: Version, id: number): string {
     fields.push({ name: 'ShotDelay', type: 'int64', value: 'ShotDelay' }, { name: 'ShotWindow', type: 'int64', value: 'ShotWindow' });
   const resultType = `struct{ ${fields.map((f) => `${f.name} ${f.type}`).join('; ')} }`;
   const timeFields = v >= 3 ? ['LastBidAt', 'FirstBidAt', 'CreatedAt', 'PoppedAt'] : ['LastBidAt', 'CreatedAt'];
-  const body = [
-    `o := pool(${id})`,
-    'p := *o',
-    `${timeFields.map((n) => `p.${n}`).join(', ')} = ${timeFields.map((n) => `o.${n}`).join(', ')}`,
-    'p.History = make([]Entry, len(o.History))',
-    'for i := range o.History { p.History[i] = o.History[i]; p.History[i].At = o.History[i].At }',
-    ...(v >= 2 ? copyPointers('Roster', 'Member') : []),
-    ...(v >= 3 ? copyPointers('Shots', 'Shot') : []),
-    `return ${resultType}{`,
-    `  ${fields.map((f) => f.value).join(', ')},`,
-    '}',
-  ];
-  return [`func() ${resultType} {`, ...body.map((line) => `  ${line}`), '}()'].join('\n');
+  const assignTimeFields = `${timeFields.map((n) => `p.${n}`).join(', ')} = ${timeFields.map((n) => `o.${n}`).join(', ')}`;
+
+  return `func() ${resultType} {
+  o := pool(${id})
+  p := *o
+  ${assignTimeFields}
+  p.History = make([]Entry, len(o.History))
+  for i := range o.History {
+    p.History[i] = o.History[i]
+    p.History[i].At = o.History[i].At
+  }
+  ${v >= 2 ? copyPointers('Roster', 'Member') : ''}
+  ${v >= 3 ? copyPointers('Shots', 'Shot') : ''}
+  return ${resultType} { ${fields.map((f) => f.value).join(', ')} }
+}()`;
 }
 
 /**
