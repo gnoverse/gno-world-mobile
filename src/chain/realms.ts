@@ -40,5 +40,4 @@ export const caps = (v: Version) => ({
   withdraw: v >= 3,
   me: v >= 2,
   flags: v >= 2,
-  poolJson: v >= 3,
 });

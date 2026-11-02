@@ -31,9 +31,9 @@ test('Bid arguments per version', () => {
 });
 
 test('capabilities', () => {
-  expect(caps(6)).toEqual({ shots: true, withdraw: true, me: true, flags: true, poolJson: true });
-  expect(caps(5)).toEqual({ shots: true, withdraw: true, me: true, flags: true, poolJson: true });
+  expect(caps(6)).toEqual({ shots: true, withdraw: true, me: true, flags: true });
+  expect(caps(5)).toEqual({ shots: true, withdraw: true, me: true, flags: true });
   expect(caps(3).shots).toBe(false);
-  expect(caps(2)).toEqual({ shots: false, withdraw: false, me: true, flags: true, poolJson: false });
+  expect(caps(2)).toEqual({ shots: false, withdraw: false, me: true, flags: true });
   expect(caps(1).me).toBe(false);
 });

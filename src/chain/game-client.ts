@@ -3,12 +3,16 @@ import { missingPaths, querySession } from '@/session/status';
 import type { ActiveSession } from '@/session/types';
 import { bytesToHex, decodeAddress } from '@/utils/bech32';
 
-import type { ChainApi } from './api';
+import { gnoValueToJS, type ChainApi } from './api';
 import { ChainError, classifyError } from './errors';
-import { parseMe, parsePool, parseRealm, parseTeams, type Me, type Pool, type RealmInfo, type Teams } from './parse';
+import {
+  parseMe, parsePoolValue, parseRealm, parseTeams, poolValueExpr, type Me, type Pool, type RealmInfo, type Teams,
+} from './parse';
 import { bidArgs, caps, CURRENT_VERSION, REALMS, VERSIONS, type Version } from './realms';
 
 const SESSION_NOT_ALLOWED = /session not allowed error/i;
+/** Every version's pool(id) panics with this on an id it does not have. */
+const NO_SUCH_POOL = /no such pool/;
 
 export interface TxResult { hash: string; height: number }
 export interface BidOptions { ref: string; flag: string; boost: number; shot: number }
@@ -36,10 +40,18 @@ export class GameClient {
   }
 
   async pool(v: Version, id: number): Promise<Pool> {
-    if (caps(v).poolJson) return parsePool(await this.api.render(REALMS[v], `json/${id}`), v);
-    const p = (await this.realm(v)).pools.find((x) => x.id === id);
-    if (!p) throw new ChainError('other', `no pool v${v}-${id} on this network`);
-    return p;
+    try {
+      return await this.poolFromAminoJSON(v, id);
+    } catch (e) {
+      if (NO_SUCH_POOL.test(String((e as Error)?.message ?? e))) throw new ChainError('other', `no pool v${v}-${id} on this network`, e);
+      throw e;
+    }
+  }
+
+  /** The pool from qeval_json's Amino JSON instead of the realm's Render JSON, any version, in one query. */
+  private async poolFromAminoJSON(v: Version, id: number): Promise<Pool> {
+    const res = await this.api.qEvalJSONValues(REALMS[v], poolValueExpr(v, id));
+    return parsePoolValue(gnoValueToJS(res.results[0]), v);
   }
 
   async me(v: Version, addr: string): Promise<Me | null> {

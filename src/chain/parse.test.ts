@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { parseJSONLoose, parseMe, parsePool, parseRealm, parseTeams } from '@/chain/parse';
+import { parseJSONLoose, parseMe, parsePool, parsePoolValue, parseRealm, parseTeams, poolValueExpr } from '@/chain/parse';
 
 const fx = (n: string) => readFileSync(join(__dirname, '__fixtures__', n), 'utf8');
 
@@ -74,4 +74,56 @@ test('one malformed pool does not poison the realm', () => {
 test('a v6 pool has no last day: life is 0 and the winner takes the whole rest', () => {
   const p = parsePool(fx('v6-pool.json'), 6);
   expect(p).toMatchObject({ key: 'v6-1', version: 6, life: 0, liveBps: 10000 });
+});
+
+test("poolValueExpr copies each version's pool and asks its methods for what its JSON computes", () => {
+  expect(poolValueExpr(6, 3)).toBe(`func() struct{ Pool Pool; NextPrice int64; Deadline string; Over bool; ShotDelay int64; ShotWindow int64 } {
+  o := pool(3)
+  p := *o
+  p.LastBidAt, p.FirstBidAt, p.CreatedAt, p.PoppedAt = o.LastBidAt, o.FirstBidAt, o.CreatedAt, o.PoppedAt
+  p.History = make([]Entry, len(o.History))
+  for i := range o.History { p.History[i] = o.History[i]; p.History[i].At = o.History[i].At }
+  p.Roster = make([]*Member, len(o.Roster))
+  for i, x := range o.Roster { c := *x; p.Roster[i] = &c }
+  p.Shots = make([]*Shot, len(o.Shots))
+  for i, x := range o.Shots { c := *x; p.Shots[i] = &c }
+  return struct{ Pool Pool; NextPrice int64; Deadline string; Over bool; ShotDelay int64; ShotWindow int64 }{
+    p, o.NextPrice(), unix(o.Deadline()), o.Over(), ShotDelay, ShotWindow,
+  }
+}()`);
+  expect(poolValueExpr(4, 1)).toMatch(/LastDay string; LiveBps int64; ShotDelay int64; ShotWindow int64 }/);
+  expect(poolValueExpr(3, 1)).toMatch(/Over bool; LastDay string; LiveBps int64 }.*p\.Shots = /s);
+  const v2 = poolValueExpr(2, 1);
+  expect(v2).toContain('\n  p.LastBidAt, p.CreatedAt = o.LastBidAt, o.CreatedAt\n');
+  expect(v2).toContain('p.Roster = ');
+  expect(v2).not.toContain('Shots');
+  expect(poolValueExpr(1, 1)).toMatch(/Over bool }/);
+  expect(poolValueExpr(1, 1)).not.toContain('Roster');
+});
+
+test('parsePoolValue derives what the JSON derives from the struct', () => {
+  const answer = {
+    Pool: {
+      ID: 2, LastBidder: 'g1b', WinnerFlag: '', LastBidAt: 50, Clock: 10,
+      History: [{ N: 1 }, { N: 2 }],
+      Roster: [
+        { Addr: 'g1a', Flag: 'US', Paid: 5 }, { Addr: 'g1b', Flag: 'FR', Paid: 3 }, { Addr: 'g1c', Flag: 'US', Paid: 2 },
+        { Addr: 'g1d', Flag: '', Paid: 9 },
+      ],
+      Shots: [{ N: 1, CommitH: 100, Resolved: true }, { N: 2, CommitH: 110, Resolved: false }],
+    },
+    NextPrice: 7, Deadline: '60', Over: false, ShotDelay: 3, ShotWindow: 2,
+  };
+  const p = parsePoolValue(answer, 6);
+  expect(p).toMatchObject({
+    key: 'v6-2', nextPrice: 7, deadline: 60, lastDay: 0, liveBps: 10000, bidders: 4, shots: 2, pending: 1,
+    flag: 'FR', teams: { US: 7, FR: 3 },
+  });
+  expect(p.history.map((h) => h.n)).toEqual([2, 1]); // newest first, as the JSON
+  expect(p.shotlog.map((s) => [s.n, s.revealAt, s.revealBy])).toEqual([[2, 113, 115], [1, 103, 105]]);
+  expect(parsePoolValue({ ...answer, Pool: { ...answer.Pool, WinnerFlag: 'US' } }, 6).flag).toBe('US');
+  // v3 has no reveal window in its JSON
+  const { ShotDelay, ShotWindow, ...v3 } = answer;
+  expect(parsePoolValue({ ...v3, LastDay: '90', LiveBps: 9808 }, 3)).toMatchObject({ lastDay: 90, liveBps: 9808 });
+  expect(parsePoolValue(v3, 3).shotlog[0]).toMatchObject({ revealAt: 0, revealBy: 0 });
 });
