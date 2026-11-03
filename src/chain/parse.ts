@@ -1,4 +1,4 @@
-import { poolKey, type Version } from './realms';
+import { caps, poolKey, type Version } from './realms';
 
 export interface BidEntry { n: number; bidder: string; flag: string; price: number; shot: number; clock: number; pot: number; at: number }
 export interface Member { addr: string; flag: string; paid: number; earned: number }
@@ -124,6 +124,91 @@ export function parseRealm(raw: string, v: Version): RealmInfo {
 }
 
 export const parsePool = (raw: string, v: Version): Pool => toPool(load(raw, `pool v${v}`), v);
+
+/** poolValueExpr's Go for a list of pointers: point each element of the copy `p`'s list at a copy of the stored `o`'s. */
+function copyPointers(list: string, type: string): string {
+  return `p.${list} = make([]*${type}, len(o.${list}))
+  for i, x := range o.${list} {
+    c := *x
+    p.${list}[i] = &c
+  }`;
+}
+
+/**
+ * The qeval expression parsePoolValue reads, in one query: a function literal that copies the pool into new values,
+ * which the VM sends whole (a stored object would come as a ref, one more query each), with what its JSON takes
+ * from its methods, computed by the realm's own code — v3–v5's last day and live share, v4+'s reveal window.
+ * A copied struct keeps its time fields as refs: each is assigned again from the stored one, which copies it.
+ * Only the times' locations stay refs, and gnoValueToJS does not read them.
+ */
+export function poolValueExpr(v: Version, id: number): string {
+  // The fields of the struct the function returns, and the Go that computes each: `o` is the stored pool, `p` its copy.
+  const fields = [
+    { name: 'Pool', type: 'Pool', value: 'p' },
+    { name: 'NextPrice', type: 'int64', value: 'o.NextPrice()' },
+    { name: 'Deadline', type: 'string', value: 'unix(o.Deadline())' },
+    { name: 'Over', type: 'bool', value: 'o.Over()' },
+  ];
+  if (v >= 3 && v <= 5)
+    fields.push({ name: 'LastDay', type: 'string', value: 'unix(o.LastDay())' }, { name: 'LiveBps', type: 'int64', value: 'o.LiveBps()' });
+  if (caps(v).shots)
+    fields.push({ name: 'ShotDelay', type: 'int64', value: 'ShotDelay' }, { name: 'ShotWindow', type: 'int64', value: 'ShotWindow' });
+  const resultType = `struct{ ${fields.map((f) => `${f.name} ${f.type}`).join('; ')} }`;
+  const timeFields = v >= 3 ? ['LastBidAt', 'FirstBidAt', 'CreatedAt', 'PoppedAt'] : ['LastBidAt', 'CreatedAt'];
+  const assignTimeFields = `${timeFields.map((n) => `p.${n}`).join(', ')} = ${timeFields.map((n) => `o.${n}`).join(', ')}`;
+
+  return `func() ${resultType} {
+  o := pool(${id})
+  p := *o
+  ${assignTimeFields}
+  p.History = make([]Entry, len(o.History))
+  for i := range o.History {
+    p.History[i] = o.History[i]
+    p.History[i].At = o.History[i].At
+  }
+  ${v >= 2 ? copyPointers('Roster', 'Member') : ''}
+  ${v >= 3 ? copyPointers('Shots', 'Shot') : ''}
+  return ${resultType} { ${fields.map((f) => f.value).join(', ')} }
+}()`;
+}
+
+/**
+ * parsePool from qeval_json's Amino JSON instead of the realm's Render JSON, so no parseJSONLoose: `answer` is poolValueExpr's
+ * result as gnoValueToJS gives it. What the JSON derives from the struct (bidders, pending, the flag, the
+ * teams, newest-first lists) is derived here the same way.
+ */
+export function parsePoolValue(answer: unknown, v: Version): Pool {
+  const a = obj(answer);
+  const p = obj(a.Pool);
+  const roster = arr(p.Roster);
+  const shots = arr(p.Shots);
+  const teams: Record<string, number> = {};
+  for (const m of roster) if (str(m.Flag)) teams[str(m.Flag)] = (teams[str(m.Flag)] ?? 0) + num(m.Paid);
+  const reveal = a.ShotDelay !== undefined;
+  return toPool(
+    {
+      id: p.ID, name: p.Name, creator: p.Creator, window: p.Window, life: p.Life, basePrice: p.BasePrice, seed: p.Seed,
+      pot: p.Pot, bids: p.Bids, nextPrice: a.NextPrice, lastBidder: p.LastBidder, lastBidAt: p.LastBidAt,
+      firstBidAt: p.FirstBidAt, deadline: Number(str(a.Deadline)), lastDay: Number(str(a.LastDay)), liveBps: a.LiveBps,
+      clock: p.Clock, createdAt: p.CreatedAt, over: a.Over, popped: p.Popped, paid: p.Paid, cancelled: p.Cancelled,
+      bidders: roster.length, shots: shots.length, misses: p.Misses, pending: shots.filter((s) => !bool(s.Resolved)).length,
+      flag: str(p.WinnerFlag) || str(roster.find((m) => m.Addr === p.LastBidder)?.Flag), teams,
+      creatorPaid: p.CreatorPaid, divPaid: p.DivPaid, refPaid: p.RefPaid, treasuryPaid: p.TreasuryPaid,
+      winnerPaid: p.WinnerPaid, teamPaid: p.TeamPaid, sharedPaid: p.SharedPaid,
+      history: arr(p.History).reverse().map((h) => ({
+        n: h.N, bidder: h.Bidder, flag: h.Flag, price: h.Price, shot: h.Shot, clock: h.Clock, pot: h.Pot, at: h.At,
+      })),
+      roster: roster.map((m) => ({ addr: m.Addr, flag: m.Flag, paid: m.Paid, earned: m.Earned })),
+      shotlog: arr(p.Shots).reverse().map((s) => ({
+        n: s.N, bidder: s.Bidder, paid: s.Paid, take: s.Take, bps: s.Bps,
+        revealAt: reveal ? num(s.CommitH) + num(a.ShotDelay) : 0,
+        revealBy: reveal ? num(s.CommitH) + num(a.ShotDelay) + num(a.ShotWindow) : 0,
+        resolved: s.Resolved, hit: s.Won, void: s.Void,
+      })),
+    },
+    v,
+  );
+}
 
 export function parseMe(raw: string): Me {
   const o = load(raw, 'player');

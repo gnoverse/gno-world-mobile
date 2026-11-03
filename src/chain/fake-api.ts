@@ -1,3 +1,5 @@
+import type { GnoValue, QEvalJSONValuesResponse, QObjectJSONValueResponse } from '@gnolang/gnonative';
+
 import { bytesToHex } from '@/utils/bech32';
 
 import type { ChainApi, Coin, SessionAccountInfo } from './api';
@@ -5,6 +7,8 @@ import type { ChainApi, Coin, SessionAccountInfo } from './api';
 /** In-memory ChainApi for unit tests. */
 export class FakeChainApi implements ChainApi {
   renders = new Map<string, string>();
+  evals = new Map<string, QEvalJSONValuesResponse>(); // key: pkg:expression
+  objects = new Map<string, QObjectJSONValueResponse>(); // key: objectId
   calls: { pkg: string; fnc: string; args: string[]; gasFee: string; gasWanted: bigint; signerHex: string; send?: Coin[] }[] = [];
   failNextCall: Error | null = null;
   /** the next call's stream ends without a result */
@@ -22,6 +26,16 @@ export class FakeChainApi implements ChainApi {
   async render(pkg: string, args: string) {
     const r = this.renders.get(`${pkg}:${args}`);
     if (r === undefined) throw new Error(`no render for ${pkg}:${args}`);
+    return r;
+  }
+  async qEvalJSONValues(pkg: string, expression: string) {
+    const r = this.evals.get(`${pkg}:${expression}`);
+    if (r === undefined) throw new Error(`no eval for ${pkg}:${expression}`);
+    return r;
+  }
+  async qObjectJSONValue(value: GnoValue) {
+    const r = this.objects.get(value.objectId);
+    if (r === undefined) throw new Error(`no object ${value.objectId}`);
     return r;
   }
   async call(pkg: string, fnc: string, args: string[], gasFee: string, gasWanted: bigint, signer: Uint8Array, send?: Coin[]) {

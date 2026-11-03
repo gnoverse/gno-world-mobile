@@ -11,6 +11,8 @@ export function nodeChainApi(baseUrl: string): ChainApi {
     setRemote: (remote) => c.setRemote({ remote }),
     setChainID: (chainId) => c.setChainID({ chainId }),
     render: async (packagePath, args) => (await c.render({ packagePath, args })).result,
+    qEvalJSONValues: (packagePath, expression) => c.qEvalJSONValues({ packagePath, expression }),
+    qObjectJSONValue: (value) => c.qObjectJSONValue({ value }),
     call: async (packagePath, fnc, args, gasFee, gasWanted, signerAddress, send) =>
       c.call({ gasFee, gasWanted, signerAddress, msgs: [{ packagePath, fnc, args, send }] }),
     queryAccount: (address) => c.queryAccount({ address }),

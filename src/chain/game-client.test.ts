@@ -1,10 +1,12 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
+import type { QEvalJSONValuesResponse } from '@gnolang/gnonative';
+
 import { FakeChainApi } from '@/chain/fake-api';
 import { GameClient } from '@/chain/game-client';
-import { parsePool } from '@/chain/parse';
-import { REALMS } from '@/chain/realms';
+import { parsePool, poolValueExpr } from '@/chain/parse';
+import { REALMS, type Version } from '@/chain/realms';
 import type { ActiveSession } from '@/session/types';
 import { bytesToHex, decodeAddress } from '@/utils/bech32';
 
@@ -39,6 +41,24 @@ test('bid sends price × boost + shot with the right args, gas and signer', asyn
   expect(c.gasFee).toBe('39600ugnot');
   expect(c.gasWanted).toBe(39600000n);
   expect(c.signerHex).toHaveLength(40);
+});
+
+/** qeval_json's Amino JSON for a pool, recorded from gnoland-1 through gnonative's goserver on 2026-10-28 (the pool
+ *  is over, so it still matches v<v>-<id>-pool.json), into a FakeChainApi (bigints and bytes revived). It has no
+ *  objects: a second query would throw. */
+function aminoJSONFixture(api: FakeChainApi, v: Version, id: number) {
+  const res = JSON.parse(fx(`v${v}-${id}-pool-aminojson.json`), (k, x) =>
+    k === 'offset' || k === 'length' || k === 'index' ? BigInt(x) : k === 'data' ? Uint8Array.from(Object.values(x)) : x,
+  ) as QEvalJSONValuesResponse;
+  api.evals.set(`${REALMS[v]}:${poolValueExpr(v, id)}`, res);
+}
+
+test.each([[3, 65], [6, 38]] as const)('pool reads v%i-%i from the Amino JSON as the Render JSON has it, in one query', async (v, id) => {
+  const api = new FakeChainApi();
+  aminoJSONFixture(api, v, id);
+  const p = await new GameClient(api, () => 'gnoland-1').pool(v, id);
+  expect(p).toEqual(parsePool(fx(`v${v}-${id}-pool.json`), v));
+  expect(p.shotlog.length).toBeGreaterThan(0);
 });
 
 test('teams are read from the current realm', async () => {
@@ -114,10 +134,23 @@ test('every transaction refuses a session from another chain', async () => {
   expect(api.calls).toHaveLength(0);
 });
 
-test('a pool a v1 realm does not list is a classified error', async () => {
+test.each([1, 6] as const)("a pool the v%i realm does not have is a classified error, not the realm's panic", async (v) => {
   const api = new FakeChainApi();
-  api.renders.set(`${REALMS[1]}:json`, '{"now":1,"pools":[]}');
-  await expect(new GameClient(api, () => 'gnoland-1').pool(1, 9)).rejects.toMatchObject({ name: 'ChainError', kind: 'other' });
+  api.qEvalJSONValues = async () => {
+    throw new Error('[unknown] ErrChainRejected(#155): no such pool'); // as gnonative passes on the panic
+  };
+  await expect(new GameClient(api, () => 'gnoland-1').pool(v, 9)).rejects.toMatchObject({
+    name: 'ChainError', kind: 'other', message: `no pool v${v}-9 on this network`,
+  });
+});
+
+test('other errors reading a pool pass through', async () => {
+  const e = new Error('network request failed');
+  const api = new FakeChainApi();
+  api.qEvalJSONValues = async () => {
+    throw e;
+  };
+  await expect(new GameClient(api, () => 'gnoland-1').pool(6, 9)).rejects.toBe(e);
 });
 
 test('a transaction whose stream ends without a result has an unknown outcome', async () => {
