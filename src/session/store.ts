@@ -88,6 +88,9 @@ export const createSessionStore = (d: SessionDeps) => {
   let poll = { aborted: false };
   let starting = false; // a begin/revoke is between its start and its send (a double tap)
   let generation = 0; // bumped by cancel() and forget(): a begin started before must not send
+  // bumped by pause() (so networkChanged()) and forget(): a read of the chain started before must not go on, nor start
+  // a poll; a counter, not a one-way flag, so that what starts after (a restore()) works as usual
+  let reads = 0;
   const interval = d.pollIntervalMs ?? 3000;
   const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -123,17 +126,20 @@ export const createSessionStore = (d: SessionDeps) => {
         /** After a renewal: the old session should leave the chain (same transaction from a wallet, a second one from
          *  gnokey). Its key goes once it has; if it is still there after a while, the screen offers to revoke it. */
         const watchPrevious = async (old: ActiveSession, next: SessionKey) => {
+          const since = reads;
           const tries = Math.max(1, Math.round((d.previousWaitMs ?? 30000) / interval));
           for (let i = 0; i < tries; i++) {
+            if (since !== reads) return; // paused: stop reading the chain
             if (get().active?.address !== next.address) return; // forgotten, revoked or replaced meanwhile
             const st = await querySession(d.api(), old.master, old.address).catch(() => undefined);
+            if (since !== reads) return;
             if (st === null) {
               drop(old);
               return;
             }
             await sleep(interval);
           }
-          if (get().active?.address === next.address) set({ previous: old });
+          if (since === reads && get().active?.address === next.address) set({ previous: old });
         };
 
         const commandFor = (p: Pending): string => {
@@ -147,7 +153,13 @@ export const createSessionStore = (d: SessionDeps) => {
         const current = (p: Pending, signal: { aborted: boolean }): boolean =>
           !signal.aborted && get().pending?.state === p.state && d.network().chainId === p.chainId;
 
-        const waitForChain = async (p: Pending, master: string) => {
+        /** `since`: `reads` when the caller started; paused since, no poll starts (the request keeps its master, so
+         *  restore() resumes it). */
+        const waitForChain = async (p: Pending, master: string, since: number) => {
+          if (since !== reads) {
+            if (get().pending?.state === p.state) set({ pending: { ...get().pending!, master } });
+            return;
+          }
           poll.aborted = true; // whatever happens next, a poll already running for this request must stop
           if (p.chainId !== d.network().chainId) {
             set({ phase: 'error', error: otherChainRequestError(p.chainId) });
@@ -179,7 +191,7 @@ export const createSessionStore = (d: SessionDeps) => {
         };
 
         /** Show the gnokey command; when the master is known (renewal, revocation, identity-only answer), watch the chain at once. */
-        const desktop = (master?: string): void => {
+        const desktop = (master?: string, since = reads): void => {
           const p = get().pending;
           if (!p) return;
           // Check network chain before showing desktop or polling
@@ -190,21 +202,21 @@ export const createSessionStore = (d: SessionDeps) => {
           const next = { ...p, via: 'desktop' as const };
           set({ pending: next, phase: 'desktop', command: commandFor(next) });
           const known = master ?? (p.op === 'create' ? undefined : get().active?.master);
-          if (known) void waitForChain(next, known);
+          if (known) void waitForChain(next, known, since);
         };
 
-        const send = async (p: Pending, link: string) => {
+        const send = async (p: Pending, link: string, since: number) => {
           poll.aborted = true; // abort any running poll before setting new pending
           set({ pending: p, phase: 'waiting-wallet', command: commandFor(p), error: undefined });
           starting = false; // the pending request now blocks a second one, even if the wallet never comes back
           if (d.wallet === false) {
-            get().useDesktop();
+            desktop(undefined, since);
             return;
           }
           try {
             await d.openURL(link);
           } catch {
-            get().useDesktop();
+            desktop(undefined, since);
           }
         };
 
@@ -229,6 +241,7 @@ export const createSessionStore = (d: SessionDeps) => {
             if (starting || get().pending) return;
             starting = true;
             const gen = generation;
+            const since = reads;
             let key: SessionKey | undefined;
             try {
               const old = get().active;
@@ -244,7 +257,7 @@ export const createSessionStore = (d: SessionDeps) => {
                 drop(key); // cancelled while the request was being prepared
                 return;
               }
-              await send(p, link);
+              await send(p, link, since);
             } catch (e) {
               drop(key);
               if (gen !== generation) return; // cancelled meanwhile: no error card for a dropped request
@@ -258,6 +271,7 @@ export const createSessionStore = (d: SessionDeps) => {
             if (starting || get().pending) return;
             starting = true;
             const gen = generation;
+            const since = reads;
             try {
               const active = get().active;
               if (!active) throw new Error('no session to revoke');
@@ -266,7 +280,7 @@ export const createSessionStore = (d: SessionDeps) => {
               };
               const link = await linkFor(p);
               if (gen !== generation) return;
-              await send(p, link);
+              await send(p, link, since);
             } catch (e) {
               fail(e);
             } finally {
@@ -282,10 +296,11 @@ export const createSessionStore = (d: SessionDeps) => {
             const p = get().pending;
             if (!p) throw new Error('nothing is waiting for an address');
             if (!isAddress(master.trim())) throw new Error('that is not a gno address (g1…, 40 characters)');
-            await waitForChain(p, master.trim());
+            await waitForChain(p, master.trim(), reads);
           },
 
           async onReply(r): Promise<void> {
+            const since = reads;
             // a reply can arrive before the persisted request is read back: wait for it (or for its failure)
             if (!ready.hasHydrated()) {
               await new Promise<void>((resolve) => {
@@ -311,7 +326,7 @@ export const createSessionStore = (d: SessionDeps) => {
             if (r.status === 'error') {
               // a wallet without `disconnect`, or without any account: the user can still sign on a computer
               if (r.code === 'unsupported_host' || r.code === 'no_signer') {
-                desktop();
+                desktop(undefined, since);
                 return;
               }
               // the request is over: back to where the user was, with the answer for an alert
@@ -339,10 +354,10 @@ export const createSessionStore = (d: SessionDeps) => {
             }
             // An identity-only `connect` answer: the wallet does not grant sessions yet, but it told us the master.
             if (p.op !== 'revoke' && !grantsKey(r, p.key.address)) {
-              desktop(master);
+              desktop(master, since);
               return;
             }
-            await waitForChain(p, master);
+            await waitForChain(p, master, since);
           },
 
           async refresh(): Promise<SessionStatus | null> {
@@ -356,6 +371,7 @@ export const createSessionStore = (d: SessionDeps) => {
           },
 
           async restore(): Promise<void> {
+            const since = reads; // a pause() from now on: stop after the await under way
             // Read pending and compute master BEFORE anything else
             const p = get().pending;
             const master = p
@@ -368,14 +384,17 @@ export const createSessionStore = (d: SessionDeps) => {
               try {
                 await unlockKey(d.api(), d.secrets, a, a.master);
               } catch {
+                if (since !== reads) return;
                 set({ phase: 'error', error: KEY_LOST_ERROR });
                 return; // nothing this phone holds can sign; the error card offers to forget it
               }
+              if (since !== reads) return;
               const keep = () => (get().pending ? get().phase : 'active');
               if (a.chainId !== d.network().chainId) {
                 set({ status: undefined, phase: keep() }); // another chain: keep it, never query it here
               } else {
                 const st = await querySession(d.api(), a.master, a.address).catch(() => undefined);
+                if (since !== reads) return;
                 if (st === null) {
                   set({ active: undefined, status: undefined, phase: get().pending ? get().phase : 'none' });
                 } else {
@@ -391,7 +410,7 @@ export const createSessionStore = (d: SessionDeps) => {
               if (p.chainId !== d.network().chainId) {
                 set({ phase: 'error', error: otherChainRequestError(p.chainId) });
               } else if (master) {
-                void waitForChain(p, master);
+                void waitForChain(p, master, since);
               } else {
                 set({ phase: p.via === 'wallet' ? 'waiting-wallet' : 'desktop', command: commandFor(p) });
               }
@@ -414,16 +433,18 @@ export const createSessionStore = (d: SessionDeps) => {
 
           pause(): void {
             poll.aborted = true;
+            reads++;
           },
 
           async networkChanged(): Promise<void> {
-            poll.aborted = true;
+            get().pause();
             await get().restore();
           },
 
           forget(): void {
             poll.aborted = true;
             generation++;
+            reads++;
             const p = get().pending;
             set({
               phase: 'none', active: undefined, pending: undefined, status: undefined, command: undefined, error: undefined,

@@ -33,3 +33,6 @@ export const presenceStore = createStore<PresenceState>()((set) => ({
 }));
 
 export const usePresence = <T>(sel: (s: PresenceState) => T) => useStore(presenceStore, sel);
+
+/** Back to "nothing heard yet": what was shown came from the other world (demo mode switched). */
+export const resetPresence = () => presenceStore.setState({ country: '', count: 0, reachable: true });

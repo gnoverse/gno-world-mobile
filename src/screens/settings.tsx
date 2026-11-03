@@ -1,11 +1,15 @@
 import Constants from 'expo-constants';
 import { useEffect, useRef, useState } from 'react';
+import { router } from 'expo-router';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Page } from '@/components/page';
 import { Field } from '@/components/field';
+import { demoStore, useDemo } from '@/demo-mode/store';
+import { confirmLeave, confirmRestart } from '@/demo-mode/ui/confirm';
+import { DemoOfferDialog } from '@/demo-mode/ui/offer-modal';
 import { useSession } from '@/state/app-services';
 import { matchingPreset, NETWORK_PRESETS, settingsStore, useSettings, validateOffchainUrl, validateRemote } from '@/state/settings';
 import { colors, space } from '@/theme';
@@ -14,6 +18,8 @@ import { colors, space } from '@/theme';
 export const PRIVACY_POLICY_URL = 'https://berty.tech/gno-world-privacy-policy';
 
 export function SettingsScreen() {
+  const demo = useDemo((x) => x.on);
+  const [offering, setOffering] = useState(false);
   const s = useSettings((x) => x);
   const active = useSession((x) => x.active);
   const [chainId, setChainId] = useState(s.chainId);
@@ -33,8 +39,47 @@ export function SettingsScreen() {
   const preset = matchingPreset(chainId, remote);
   const dirty = chainId !== s.chainId || remote !== s.remote || offchain !== s.offchainUrl;
 
+  const demoCard = (
+    <Card>
+      <Text style={styles.h}>Demo mode</Text>
+      {demo ? (
+        <>
+          <Button
+            kind="secondary" title="Restart the guide"
+            onPress={async () => {
+              if (!(await confirmRestart())) return;
+              demoStore.getState().restart();
+              router.replace('/');
+            }} />
+          <Button
+            kind="danger" title="Leave demo mode"
+            onPress={async () => {
+              if (!(await confirmLeave())) return;
+              demoStore.getState().leave();
+              router.replace('/');
+            }} />
+          <Text style={styles.muted}>Network and server settings are hidden in demo mode.</Text>
+        </>
+      ) : (
+        <Button kind="secondary" title="Try demo mode" onPress={() => setOffering(true)} />
+      )}
+    </Card>
+  );
+
+  if (demo)
+    return (
+      <Page style={styles.page}>
+        {demoCard}
+        <Text style={styles.link} accessibilityRole="link" onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}>
+          Privacy policy
+        </Text>
+        <Text style={styles.muted}>gno.world mobile {Constants.expoConfig?.version ?? ''}</Text>
+      </Page>
+    );
+
   return (
     <Page style={styles.page}>
+      <DemoOfferDialog visible={offering} onClose={() => setOffering(false)} />
       <Card>
         <Text style={styles.h}>Network</Text>
         <View style={styles.row}>
@@ -64,6 +109,7 @@ export function SettingsScreen() {
           settingsStore.getState().setOffchainUrl(offchain);
         }}
       />
+      {demoCard}
       <Text style={styles.link} accessibilityRole="link" onPress={() => void Linking.openURL(PRIVACY_POLICY_URL)}>
         Privacy policy
       </Text>

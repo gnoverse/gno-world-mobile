@@ -1,7 +1,8 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { Alert, type AlertButton } from 'react-native';
 import { createStore } from 'zustand/vanilla';
 
+import { demoStore } from '@/demo-mode/store';
 import { NO_IDENTITY } from '@/offchain/chat/identity';
 import type { SyncState } from '@/offchain/sync/store';
 import { PairScreen, SPENT } from '@/screens/pair';
@@ -120,4 +121,33 @@ test('typing a new code clears the last outcome', async () => {
   await waitFor(() => expect(screen.getByText(SPENT)).toBeTruthy());
   await fireEvent.changeText(screen.getByLabelText('pairing code'), 'Q');
   expect(screen.queryByText(SPENT)).toBeNull();
+});
+
+test("in demo mode, pairing moves the guide's pairing step on", async () => {
+  jest.spyOn(Alert, 'alert').mockImplementation(press('Continue'));
+  demoStore.getState().enter();
+  for (let i = 0; i < 4; i++) demoStore.getState().next(); // Pair with a browser
+  try {
+    await render(<PairScreen store={make()} identity={NO_IDENTITY} demoCode="DEM234" />);
+    await fireEvent.changeText(screen.getByLabelText('pairing code'), 'DEM234');
+    await fireEvent.press(screen.getByText('Pair'));
+    await waitFor(() => expect(screen.getByText(WORDS)).toBeTruthy());
+    expect(demoStore.getState().guideStep).toBe(5);
+  } finally {
+    await act(() => demoStore.getState().leave());
+  }
+});
+
+test("in demo mode, the guide's pairing target holds the code, Pair and the hint: its bubble covers none of them", async () => {
+  demoStore.getState().enter();
+  for (let i = 0; i < 4; i++) demoStore.getState().next(); // Pair with a browser
+  try {
+    await render(<PairScreen store={make()} identity={NO_IDENTITY} demoCode="DEM234" />);
+    const target = within(screen.getByTestId('guide-target-pair.input'));
+    expect(target.getByLabelText('pairing code')).toBeTruthy();
+    expect(target.getByText('Pair')).toBeTruthy();
+    expect(target.getByText('Demo: type DEM234, or any six letters and digits (no 0, 1, I, L or O).')).toBeTruthy();
+  } finally {
+    await act(() => demoStore.getState().leave());
+  }
 });

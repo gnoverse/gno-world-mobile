@@ -6,6 +6,8 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Countdown } from '@/components/countdown';
 import { Page } from '@/components/page';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
+import { demoStore } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import type { ChatIdentity } from '@/offchain/chat/identity';
 import type { SyncState } from '@/offchain/sync/store';
@@ -26,7 +28,8 @@ const confirmPair = (paired: boolean) =>
     ], { cancelable: true, onDismiss: () => resolve(false) });
   });
 
-export function PairScreen({ store, identity }: { store: StoreApi<SyncState>; identity: ChatIdentity }) {
+/** `demoCode`: in demo mode, the code the simulated browser knows (the hint under the field) */
+export function PairScreen({ store, identity, demoCode }: { store: StoreApi<SyncState>; identity: ChatIdentity; demoCode?: string }) {
   const s = useStore(store);
   const [typed, setTyped] = useState('');
   const [outcome, setOutcome] = useState('');
@@ -44,6 +47,7 @@ export function PairScreen({ store, identity }: { store: StoreApi<SyncState>; id
     if (words) {
       setOutcome(words);
       setTyped('');
+      demoStore.getState().emit('pair.paired');
     }
   };
   const stop = () =>
@@ -81,22 +85,26 @@ export function PairScreen({ store, identity }: { store: StoreApi<SyncState>; id
 
       <Card>
         <Text style={styles.h}>Enter a code</Text>
-        <TextInput
-          accessibilityLabel="pairing code"
-          style={styles.input}
-          value={typed}
-          onChangeText={(t) => {
-            setTyped(t);
-            setOutcome('');
-            if (store.getState().acceptError) store.getState().clearError();
-          }}
-          placeholder="a code from the other device"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={7}
-        />
-        <Button title={s.busy === 'accept' ? 'Pairing…' : 'Pair'} disabled={!!s.busy || !typed.trim()} onPress={() => void pair()} />
+        {/* the code, Pair and the hint: the guide's bubble goes beside them all, not over Pair */}
+        <GuideTarget id="pair.input" style={styles.entry}>
+          <TextInput
+            accessibilityLabel="pairing code"
+            style={styles.input}
+            value={typed}
+            onChangeText={(t) => {
+              setTyped(t);
+              setOutcome('');
+              if (store.getState().acceptError) store.getState().clearError();
+            }}
+            placeholder="a code from the other device"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={7}
+          />
+          <Button title={s.busy === 'accept' ? 'Pairing…' : 'Pair'} disabled={!!s.busy || !typed.trim()} onPress={() => void pair()} />
+          {demoCode ? <Text style={styles.muted}>{`Demo: type ${demoCode}, or any six letters and digits (no 0, 1, I, L or O).`}</Text> : null}
+        </GuideTarget>
         {s.acceptError ? <Text style={styles.bad}>{s.acceptError}</Text> : null}
         {outcome ? <Text style={styles.text}>{outcome}</Text> : null}
       </Card>
@@ -144,4 +152,6 @@ const styles = StyleSheet.create({
   bad: { color: colors.bad },
   code: { color: colors.accent, fontSize: 36, fontWeight: '700', letterSpacing: 8, fontVariant: ['tabular-nums'], fontFamily: Platform.select({ ios: 'Menlo', default: 'monospace' }) },
   input: { color: colors.fg, borderColor: colors.line, borderWidth: 1, borderRadius: radius.s, padding: space.m, letterSpacing: 4 },
+  // in demo mode only, a View around the code entry: the card's own gap
+  entry: { gap: space.s },
 });

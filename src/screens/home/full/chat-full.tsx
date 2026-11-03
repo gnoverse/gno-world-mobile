@@ -10,7 +10,6 @@ import { ChannelTabs } from '@/screens/channels/channel-tabs';
 import { useHomeTabs } from '@/screens/channels/use-home-tabs';
 import { ChatLineRow } from '@/screens/chat/chat-line';
 import { useServices } from '@/state/app-services';
-import { useSettings } from '@/state/settings';
 import { colors, space } from '@/theme';
 
 import { FullHeader, useBottomGap } from './full-header';
@@ -18,14 +17,16 @@ import { ShowOnHome } from './show-on-home';
 
 const NO_REACTIONS: string[] = [];
 const nothing = () => {};
+/** Demo mode: the demo's rooms are not on the website, so a room link closes the card and opens the room in Chat. */
+const openRoomInChat = (id: string) => router.dismissTo({ pathname: '/chat', params: { room: id } });
 
 /** The chat to read: Home's channels, live, with nothing to write, react or vote with. */
 export function ChatFull() {
-  const { homeChannels, chatChannel } = useServices();
+  const { homeChannels, chatChannel, avatarUri, demo } = useServices();
+  const onRoomLink = demo ? openRoomInChat : undefined;
   const { channels, current, name, store: chat, select } = useHomeTabs();
   const [picking, setPicking] = useState(false);
   const s = useStore(chat);
-  const offchainUrl = useSettings((st) => st.offchainUrl);
   const now = useNow(15000);
   const bottom = useBottomGap();
   const list = useRef<FlatList<ChatLine>>(null);
@@ -47,11 +48,11 @@ export function ChatFull() {
   }, [chat]);
   const renderItem = useCallback(({ item }: { item: ChatLine }) => (
     <ChatLineRow
-      readOnly line={item} mine={isMine(item, s.you, s.mine)} now={now} offchainUrl={offchainUrl}
+      readOnly line={item} mine={isMine(item, s.you, s.mine)} now={now} avatarUri={avatarUri}
       myReactions={s.myReactions[item.id] ?? NO_REACTIONS} myVote={s.myVotes[item.id]}
-      onLongPress={nothing} onJump={jumpTo} onReact={nothing} onVote={nothing}
+      onLongPress={nothing} onJump={jumpTo} onReact={nothing} onVote={nothing} onRoomLink={onRoomLink}
     />
-  ), [s.you, s.mine, s.myReactions, s.myVotes, now, offchainUrl, jumpTo]);
+  ), [s.you, s.mine, s.myReactions, s.myVotes, now, avatarUri, jumpTo, onRoomLink]);
 
   return (
     <View style={styles.root}>

@@ -8,7 +8,7 @@ export interface SecretStore {
   set(key: string, value: string): Promise<void>;
 }
 
-const PASSWORD_KEY = 'br.keybase.password';
+export const PASSWORD_KEY = 'br.keybase.password';
 const inFlightPasswords = new WeakMap<SecretStore, Promise<string>>();
 
 /** One random password protects every session key in gnonative's keybase; it lives in the secure store. */

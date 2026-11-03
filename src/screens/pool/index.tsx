@@ -1,5 +1,5 @@
 import { Link, useFocusEffect } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Share, StyleSheet, Text } from 'react-native';
 
 import type { Pool, RealmInfo } from '@/chain/parse';
@@ -8,6 +8,9 @@ import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Page } from '@/components/page';
 import { Countdown } from '@/components/countdown';
+import { GUIDED_POOL_KEY } from '@/demo-mode/constants';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
+import { demoStore, useGuideMoved } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import { reportBoop } from '@/offchain/chat/boop-report';
 import { isPlayBlocked, NOPLAY_TEXT, usePresence } from '@/offchain/presence';
@@ -29,13 +32,14 @@ import { createTxRunner } from './tx-runner';
 
 export function PoolScreen({ poolKey }: { poolKey: string }) {
   const k = useMemo(() => parsePoolKey(poolKey), [poolKey]);
-  const { game, chatClient } = useServices();
+  const { game, chatClient, demo } = useServices();
   const active = useSession((s) => s.active);
   const status = useSession((s) => s.status);
   const refresh = useSession((s) => s.refresh);
   const country = usePresence((s) => s.country);
-  const flag = useSettings((s) => s.flag);
-  const ref = useSettings((s) => s.ref);
+  // demo mode neither reads nor uses the real settings' flag and referrer: the demo country, no referrer
+  const flag = useSettings((s) => (demo ? '' : s.flag));
+  const ref = useSettings((s) => (demo ? '' : s.ref));
   const now = useNow();
   const [pool, setPool] = useState<Pool | null>(null);
   const [realm, setRealm] = useState<RealmInfo | undefined>();
@@ -46,17 +50,22 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
   // a session made on another network is not "you" here
   const me = active && active.chainId === chainId ? active.master : '';
 
-  const load = useCallback(async () => {
-    if (!k) return;
+  /** the pool read, or undefined when it could not be */
+  const load = useCallback(async (): Promise<Pool | undefined> => {
+    if (!k) return undefined;
     try {
       const [p, r] = await Promise.all([game.pool(k.version, k.id), game.realm(k.version).catch(() => undefined)]);
       setPool(p);
       setRealm((before) => r ?? before); // a realm read that failed once keeps the shot prices on screen
       setLoadError('');
+      return p;
     } catch (e) {
       setLoadError(String((e as Error).message ?? e));
+      return undefined;
     }
   }, [game, k]);
+  // the demo's guide follows its own pool only
+  const guided = poolKey === GUIDED_POOL_KEY;
 
   // every 10 s while the screen is shown, and at once on coming back to it
   useFocusEffect(
@@ -66,6 +75,14 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
       return () => clearInterval(t);
     }, [load]),
   );
+
+  // the demo's guide: the pool it asked to open is open
+  useEffect(() => {
+    if (guided) demoStore.getState().emit('pool.opened');
+  }, [guided]);
+
+  // the guide moved on, maybe because its Next booped, ended or claimed this pool for you: read it again
+  useGuideMoved(() => void Promise.all([load(), refresh().catch(() => undefined)]), guided);
 
   // one runner for the screen's life: it keeps the transaction in flight across renders
   const [runner] = useState(() => createTxRunner(setBusy));
@@ -96,8 +113,9 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
         setPool(fresh);
         return stale;
       }
-      if (c.flag) settingsStore.getState().setFlag(c.flag);
+      if (c.flag && !demo) settingsStore.getState().setFlag(c.flag); // demo mode writes no settings
       await game.bid(active!, pool, { ref: effectiveRef, flag: c.flag, boost: c.boost, shot: c.shot });
+      if (guided) demoStore.getState().emit('pool.booped');
       // as the site does: the off-chain server ties this client to the account that booped (name reservation)
       void reportBoop({
         report: chatClient.reportBoop, readPool: () => game.pool(pool.version, pool.id),
@@ -145,15 +163,48 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
               <Link href="/session" style={styles.link}>Get a session for {chainId} →</Link>
             </>
           ) : (
-            <BoopPanel
-              pool={pool} realm={realm} me={me} hasRef={!!effectiveRef} defaultFlag={flag || country}
-              suggestions={suggestions} busy={busy} budget={budget} onBoop={onBoop}
-            />
+            <GuideTarget id="pool.boop">
+              <BoopPanel
+                pool={pool} realm={realm} me={me} hasRef={!!effectiveRef} defaultFlag={flag || country}
+                suggestions={suggestions} busy={busy} budget={budget} onBoop={onBoop}
+              />
+            </GuideTarget>
           )}
         </Card>
       ) : null}
 
-      {closedUnpaid && active ? <Button title="claim" disabled={busy} onPress={() => run('claim', () => game.claim(active, pool))} /> : null}
+      {demo && live ? (
+        <GuideTarget id="pool.endNow">
+          <Button
+            kind="secondary" title="⏩ End now · demo"
+            onPress={() => {
+              try {
+                demo.endNow(pool.key);
+              } catch (e) {
+                setMsg(String((e as Error).message ?? e));
+                return;
+              }
+              // the clock is over, but a pool with no boop has no winner: the guide waits for one that really ended
+              void reload().then(([p]) => {
+                if (guided && p?.over) demoStore.getState().emit('pool.ended');
+              });
+            }} />
+        </GuideTarget>
+      ) : null}
+      {closedUnpaid && active ? (
+        <GuideTarget id="pool.claim">
+          <Button
+            title="claim" disabled={busy}
+            onPress={() =>
+              run('claim', async () => {
+                const said = await game.claim(active, pool);
+                if (guided) demoStore.getState().emit('pool.claimed');
+                return said;
+              })
+            }
+          />
+        </GuideTarget>
+      ) : null}
       {canCancel ? <Button kind="danger" title="cancel this pool" disabled={busy} onPress={() => run('cancel', () => game.cancel(active!, pool))} /> : null}
       {msg ? <Text style={styles.msg}>{msg}</Text> : null}
       {loadError ? <Text style={styles.warn}>Could not refresh this pool: {loadError}</Text> : null}

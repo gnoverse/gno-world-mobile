@@ -792,3 +792,101 @@ test('(a) a begin cancelled and then failing still deletes its key', async () =>
   expect(api.deleted).toHaveLength(1);
   expect(store.getState().phase).toBe('none'); // cancelled: no error card for a request the user dropped
 });
+
+/** Holds the next call of `method` until `release()`; `called` resolves when that call starts. */
+function hold<K extends 'querySessionAccount' | 'activateAccount'>(api: FakeChainApi, method: K) {
+  const real = (api[method] as (...a: unknown[]) => Promise<unknown>).bind(api);
+  let release!: () => void;
+  let started!: () => void;
+  const gate = new Promise<void>((r) => (release = r));
+  const called = new Promise<void>((r) => (started = r));
+  let once = true;
+  (api as unknown as Record<K, unknown>)[method] = async (...a: unknown[]) => {
+    if (once) {
+      once = false;
+      started();
+      await gate;
+    }
+    return real(...a);
+  };
+  return { called, release };
+}
+
+/** Counts the session reads from now on. */
+function countQueries(api: FakeChainApi) {
+  const real = api.querySessionAccount.bind(api);
+  const n = { value: 0 };
+  api.querySessionAccount = async (...a) => {
+    n.value++;
+    return real(...a);
+  };
+  return n;
+}
+
+/** An active session and a request waiting on chain with its master known: restore() reads both. */
+async function persistedActiveAndPending(s: ReturnType<typeof setup>) {
+  const active = await persistedActive(s);
+  const key = await createSessionKey(s.api, s.deps.secrets, s.deps.randomHex, s.deps.now);
+  const pending: Pending = { op: 'create', state: 'st', key, master: M, chainId: 'gnoland-1', via: 'desktop', createdAt: 1 };
+  s.mem.set('br.session', JSON.stringify({ state: { active, pending }, version: 0 }));
+  return { active, pending };
+}
+
+test('a restore paused while the chain answers makes no further read and does not start polling; a later restore resumes', async () => {
+  const s = setup();
+  const { pending } = await persistedActiveAndPending(s);
+  const store = createSessionStore(s.deps);
+  await store.persist.rehydrate();
+  const held = hold(s.api, 'querySessionAccount');
+  const queries = countQueries(s.api); // counts the held read too, when it starts
+  const restoring = store.getState().restore();
+  await held.called;
+  store.getState().pause();
+  const before = queries.value;
+  held.release();
+  await restoring;
+  await settle();
+  expect(queries.value).toBe(before); // no poll for the pending request
+  expect(store.getState().phase).not.toBe('waiting-chain');
+  expect(store.getState().pending?.state).toBe(pending.state); // the request is kept
+
+  await store.getState().restore();
+  s.onChain(pending.key.address);
+  for (let i = 0; i < 50 && store.getState().active?.address !== pending.key.address; i++) await settle();
+  expect(store.getState().active?.address).toBe(pending.key.address);
+});
+
+test('a restore paused while unlocking the key never reads the chain', async () => {
+  const s = setup();
+  await persistedActiveAndPending(s);
+  const store = createSessionStore(s.deps);
+  await store.persist.rehydrate();
+  const queries = countQueries(s.api);
+  const held = hold(s.api, 'activateAccount');
+  const restoring = store.getState().restore();
+  await held.called;
+  store.getState().pause();
+  held.release();
+  await restoring;
+  await settle();
+  expect(queries.value).toBe(0);
+  expect(store.getState().phase).not.toBe('waiting-chain');
+});
+
+test('pause() stops the watch of the old session after a renewal', async () => {
+  const s = setup({ previousWaitMs: 5000 });
+  await s.activate();
+  await s.store.getState().begin('replace', DEFAULT_GRANT);
+  const p = s.store.getState().pending!;
+  s.onChain(p.key.address);
+  const queries = countQueries(s.api);
+  await s.store.getState().onReply(reply({ state: p.state, address: M, session: p.key.address }));
+  expect(s.store.getState().active?.address).toBe(p.key.address);
+  s.store.getState().pause();
+  await settle();
+  const after = queries.value;
+  await settle();
+  await settle();
+  expect(queries.value).toBe(after);
+  expect(s.store.getState().previous).toBeUndefined();
+});

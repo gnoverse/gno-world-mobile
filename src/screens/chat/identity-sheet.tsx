@@ -5,7 +5,6 @@ import { useStore, type StoreApi } from 'zustand';
 
 import { Button } from '@/components/button';
 import { WalletSoon } from '@/components/wallet-soon';
-import { avatarUrl } from '@/offchain/chat/client';
 import type { IdentityState } from '@/offchain/chat/identity-store';
 import { walletEnabled } from '@/session/wallet-build';
 import { colors, radius, space } from '@/theme';
@@ -13,8 +12,8 @@ import { colors, radius, space } from '@/theme';
 import { avatarJpeg } from './avatar';
 
 /** `identity`: the session's master, which a reserved name belongs to; '' without a session. */
-export function IdentitySheet({ store, visible, onClose, offchainUrl, identity: wallet }: {
-  store: StoreApi<IdentityState>; visible: boolean; onClose: () => void; offchainUrl: string; identity: string;
+export function IdentitySheet({ store, visible, onClose, avatarUri, identity: wallet }: {
+  store: StoreApi<IdentityState>; visible: boolean; onClose: () => void; avatarUri: (id: string) => string; identity: string;
 }) {
   const canReserve = !!wallet;
   const identity = useStore(store, (s) => s.identity);
@@ -66,7 +65,7 @@ export function IdentitySheet({ store, visible, onClose, offchainUrl, identity: 
           <Pressable style={styles.sheet} onPress={() => undefined} accessible={false}>
             <Text style={styles.h}>You in the chat</Text>
             <View style={styles.row}>
-              {identity.av ? <Image source={{ uri: avatarUrl(offchainUrl, identity.av) }} style={styles.av} /> : <View style={styles.av} />}
+              {identity.av ? <Image source={{ uri: avatarUri(identity.av) }} style={styles.av} /> : <View style={styles.av} />}
               <Button kind="secondary" title="Choose a photo" disabled={busy} onPress={() => void pickPhoto()} />
             </View>
             <TextInput

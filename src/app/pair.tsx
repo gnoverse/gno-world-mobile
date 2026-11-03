@@ -2,7 +2,7 @@ import { PairScreen } from '@/screens/pair';
 import { useIdentity, useServices } from '@/state/app-services';
 
 export default function PairRoute() {
-  const { sync } = useServices();
+  const { sync, demo } = useServices();
   const identity = useIdentity((c) => c.identity);
-  return <PairScreen store={sync} identity={identity} />;
+  return <PairScreen store={sync} identity={identity} demoCode={demo?.pairCode} />;
 }

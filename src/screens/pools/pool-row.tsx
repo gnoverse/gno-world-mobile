@@ -3,6 +3,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type { Pool } from '@/chain/parse';
 import { Countdown } from '@/components/countdown';
+import { GUIDED_POOL_KEY } from '@/demo-mode/constants';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
 import { colors, radius, space } from '@/theme';
 import { shortAddr } from '@/utils/address';
 import { flagEmoji } from '@/utils/flag';
@@ -18,7 +20,7 @@ export function PoolRow({ pool }: { pool: Pool }) {
         : pool.bids === 0
           ? 'no boops yet'
           : `${flagEmoji(pool.flag)} ${shortAddr(pool.lastBidder)} on top`;
-  return (
+  const row = (
     <Link href={`/pool/${pool.key}`} asChild>
       <Pressable style={styles.row}>
         <View style={styles.top}>
@@ -32,6 +34,8 @@ export function PoolRow({ pool }: { pool: Pool }) {
       </Pressable>
     </Link>
   );
+  // the pool the demo's guide opens
+  return pool.key === GUIDED_POOL_KEY ? <GuideTarget id="pools.guided">{row}</GuideTarget> : row;
 }
 
 const styles = StyleSheet.create({

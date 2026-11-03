@@ -1,5 +1,5 @@
 import * as Clipboard from 'expo-clipboard';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Alert, StyleSheet, Text } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 
@@ -11,6 +11,7 @@ import { Page } from '@/components/page';
 import { CommandBlock } from '@/components/command-block';
 import { Field } from '@/components/field';
 import { WalletSoon } from '@/components/wallet-soon';
+import { useGuideMoved } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import { revokeCommand } from '@/session/fallback';
 import { expiresSoon, missingPaths, remaining, resetsIn } from '@/session/status';
@@ -28,7 +29,7 @@ import { GrantForm } from './grant-form';
 import { walletErrorText } from './wallet-error';
 
 export function SessionScreen() {
-  const { api } = useServices();
+  const { api, demo } = useServices();
   const chainId = useSettings((x) => x.chainId);
   const s = useSession((x) => x);
   const refresh = useSession((x) => x.refresh);
@@ -42,6 +43,8 @@ export function SessionScreen() {
   const [renewing, setRenewing] = useState(false);
   const [topUp, setTopUp] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
+  // the timer's re-read, for a withdraw to show its money at once
+  const reread = useRef<() => void>(undefined);
 
   useEffect(() => {
     if (!shown) return;
@@ -53,12 +56,15 @@ export function SessionScreen() {
     };
     void tick();
     const t = setInterval(tick, 15000);
+    reread.current = () => void tick();
     return () => {
       alive = false;
       clearInterval(t);
+      reread.current = undefined;
       setBalance(null);
     };
   }, [shown, api, refresh]);
+  useGuideMoved(() => reread.current?.());
 
   // the wallet answered with an error: the request is over (the store is back on the form or the session);
   // tell the user once, in words
@@ -69,7 +75,23 @@ export function SessionScreen() {
     Alert.alert(title, message);
   }, [walletError, takeWalletError, chainId]);
 
-  const page = (body: ReactNode) => <Page style={styles.page}>{body}</Page>;
+  // demo mode: the "computer" that signs the pending request (it does nothing before one exists)
+  const [approving, setApproving] = useState(false);
+  const approve =
+    demo && s.pending ? (
+      <Button
+        kind="secondary" title="Approve on the simulated computer · demo" disabled={approving}
+        onPress={() => {
+          setApproving(true);
+          void demo.approvePending().catch(() => undefined).finally(() => setApproving(false));
+        }} />
+    ) : null;
+  const page = (body: ReactNode) => (
+    <Page style={styles.page}>
+      {body}
+      {approve}
+    </Page>
+  );
 
   if (s.phase === 'error') {
     const can = errorActions(s.error, !!s.active);
@@ -206,7 +228,7 @@ export function SessionScreen() {
           />
         </Card>
         {s.previous ? <PreviousSession /> : null}
-        <Earnings session={s.active} />
+        <Earnings session={s.active} onWithdrew={() => reread.current?.()} />
       </>,
     );
   }

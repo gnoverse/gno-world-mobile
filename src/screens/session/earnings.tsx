@@ -5,6 +5,8 @@ import type { Me } from '@/chain/parse';
 import { caps, VERSIONS, type Version } from '@/chain/realms';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { GuideTarget } from '@/demo-mode/guide/guide-target';
+import { demoStore, useGuideMoved } from '@/demo-mode/store';
 import { txMessage } from '@/screens/pool/tx-message';
 import { createTxRunner } from '@/screens/pool/tx-runner';
 import type { ActiveSession } from '@/session/types';
@@ -12,7 +14,11 @@ import { useServices } from '@/state/app-services';
 import { colors, space } from '@/theme';
 import { gnot } from '@/utils/gnot';
 
-export function Earnings({ session }: { session: ActiveSession }) {
+export function Earnings({ session, onWithdrew }: {
+  session: ActiveSession;
+  /** a withdraw went through: the account's balance changed */
+  onWithdrew?: () => void;
+}) {
   const { game } = useServices();
   const [mes, setMes] = useState<Partial<Record<Version, Me>>>({});
   const [failed, setFailed] = useState<Version[]>([]); // versions whose earnings could not be read
@@ -32,6 +38,7 @@ export function Earnings({ session }: { session: ActiveSession }) {
     setFailed(VERSIONS.filter((v) => lost.includes(v)));
   }, [game, session.master]);
   useEffect(() => void load(), [load]);
+  useGuideMoved(() => void load());
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -43,6 +50,8 @@ export function Earnings({ session }: { session: ActiveSession }) {
   const [runner] = useState(() => createTxRunner(setBusy)); // setBusy after unmount is a no-op
 
   const rows = VERSIONS.filter((v) => mes[v]);
+  // the withdraw the demo's guide points at: the first one
+  const guided = rows.find((v) => caps(v).withdraw && mes[v]!.owed > 0);
   return (
     <Card>
       <Text style={{ color: colors.fg, fontWeight: '700' }}>Your earnings</Text>
@@ -55,27 +64,30 @@ export function Earnings({ session }: { session: ActiveSession }) {
       ) : null}
       {rows.map((v) => {
         const m = mes[v]!;
+        const withdraw = caps(v).withdraw && m.owed > 0 ? (
+          <Button
+            title={`withdraw ${gnot(m.owed)}`}
+            disabled={busy}
+            onPress={() =>
+              void runner(async () => {
+                try {
+                  await game.withdraw(session, v);
+                  onWithdrew?.();
+                  demoStore.getState().emit('session.withdrew');
+                  if (mounted.current) setMsg(`withdrew ${gnot(m.owed)}`);
+                } catch (e) {
+                  if (mounted.current) setMsg(txMessage(e, Math.floor(Date.now() / 1000)));
+                }
+              }, load)
+            }
+          />
+        ) : null;
         return (
           <View key={v} style={{ gap: space.xs }}>
             <Text style={{ color: colors.fg }}>
               v{v} · {m.bids} boops · put in {gnot(m.paid)} · dividends {gnot(m.divEarned)} · invites {gnot(m.refEarned)} · won {gnot(m.won)}
             </Text>
-            {caps(v).withdraw && m.owed > 0 ? (
-              <Button
-                title={`withdraw ${gnot(m.owed)}`}
-                disabled={busy}
-                onPress={() =>
-                  void runner(async () => {
-                    try {
-                      await game.withdraw(session, v);
-                      if (mounted.current) setMsg(`withdrew ${gnot(m.owed)}`);
-                    } catch (e) {
-                      if (mounted.current) setMsg(txMessage(e, Math.floor(Date.now() / 1000)));
-                    }
-                  }, load)
-                }
-              />
-            ) : null}
+            {v === guided ? <GuideTarget id="session.withdraw">{withdraw}</GuideTarget> : withdraw}
           </View>
         );
       })}

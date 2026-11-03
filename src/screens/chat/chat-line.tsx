@@ -2,28 +2,37 @@ import * as Linking from 'expo-linking';
 import { memo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { avatarUrl } from '@/offchain/chat/client';
 import type { ChatLine } from '@/offchain/chat/types';
+import { parseRoomLink } from '@/offchain/rooms/link';
 import { colors, radius, space } from '@/theme';
 import { flagEmoji } from '@/utils/flag';
 
 import { ago, placeholder, pollBars, rxWho, splitLinks } from './line-model';
 
 /** Memoised: a row renders again only when its line, its marks, the clock or a handler changes. */
-export const ChatLineRow = memo(function ChatLineRow({ line, mine, now, offchainUrl, myReactions, myVote, onLongPress, onJump, onReact, onVote, readOnly }: {
-  line: ChatLine; mine: boolean; now: number; offchainUrl: string; myReactions: string[]; myVote: number | undefined;
+export const ChatLineRow = memo(function ChatLineRow({ line, mine, now, avatarUri, myReactions, myVote, onLongPress, onJump, onReact, onVote, onRoomLink, readOnly }: {
+  line: ChatLine; mine: boolean; now: number; myReactions: string[]; myVote: number | undefined;
+  /** an avatar id's image URI (the server's, or the demo world's) */
+  avatarUri: (id: string) => string;
   onLongPress: (l: ChatLine) => void; onJump: (id: number) => void; onReact: (l: ChatLine, emoji: string) => void;
   onVote: (l: ChatLine, opt: number) => void;
+  /** given (demo mode): a gno.world room link opens that room here rather than in the browser; other links still leave */
+  onRoomLink?: (id: string) => void;
   /** to read only (Home's full-screen chat): no menu, no reacting, no voting; links and the quote jump still work */
   readOnly?: boolean;
 }) {
   const extra = placeholder(line);
   const [who, setWho] = useState<string | null>(null);
   const poll = line.poll ? pollBars(line.poll, myVote) : null;
+  const openLink = (url: string) => {
+    const room = onRoomLink ? parseRoomLink(url) : null;
+    if (room) onRoomLink!(room);
+    else void Linking.openURL(url);
+  };
   return (
     // not one accessible element: poll options, reactions and links stay reachable on their own
     <Pressable onLongPress={readOnly ? undefined : () => onLongPress(line)} delayLongPress={300} accessible={false} style={[styles.row, mine && styles.mine]}>
-      {line.av ? <Image source={{ uri: avatarUrl(offchainUrl, line.av) }} style={styles.av} /> : <View style={styles.av} />}
+      {line.av ? <Image source={{ uri: avatarUri(line.av) }} style={styles.av} /> : <View style={styles.av} />}
       <View style={styles.main}>
         {/* the row is not one accessible element: its menu is an accessibility action on the name line */}
         <Text style={styles.who} numberOfLines={1} accessible
@@ -64,7 +73,7 @@ export const ChatLineRow = memo(function ChatLineRow({ line, mine, now, offchain
         ) : (
           <Text style={styles.body}>
             {splitLinks(line.body).map((p, i) =>
-              p.url ? <Text key={i} style={styles.link} onPress={() => void Linking.openURL(p.url!)}>{p.text}</Text> : p.text)}
+              p.url ? <Text key={i} style={styles.link} onPress={() => openLink(p.url!)}>{p.text}</Text> : p.text)}
           </Text>
         )}
         {extra ? <Text style={styles.meta}>{extra}</Text> : null}
