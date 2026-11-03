@@ -6,7 +6,7 @@ import { caps, VERSIONS, type Version } from '@/chain/realms';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { GuideTarget } from '@/demo-mode/guide/guide-target';
-import { demoStore } from '@/demo-mode/store';
+import { demoStore, useGuideMoved } from '@/demo-mode/store';
 import { txMessage } from '@/screens/pool/tx-message';
 import { createTxRunner } from '@/screens/pool/tx-runner';
 import type { ActiveSession } from '@/session/types';
@@ -38,6 +38,7 @@ export function Earnings({ session, onWithdrew }: {
     setFailed(VERSIONS.filter((v) => lost.includes(v)));
   }, [game, session.master]);
   useEffect(() => void load(), [load]);
+  useGuideMoved(() => void load());
   useEffect(() => {
     mounted.current = true;
     return () => {

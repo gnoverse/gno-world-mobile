@@ -10,7 +10,7 @@ import { Page } from '@/components/page';
 import { Countdown } from '@/components/countdown';
 import { GUIDED_POOL_KEY } from '@/demo-mode/constants';
 import { GuideTarget } from '@/demo-mode/guide/guide-target';
-import { demoStore } from '@/demo-mode/store';
+import { demoStore, useGuideMoved } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import { reportBoop } from '@/offchain/chat/boop-report';
 import { isPlayBlocked, NOPLAY_TEXT, usePresence } from '@/offchain/presence';
@@ -80,6 +80,9 @@ export function PoolScreen({ poolKey }: { poolKey: string }) {
   useEffect(() => {
     if (guided) demoStore.getState().emit('pool.opened');
   }, [guided]);
+
+  // the guide moved on, maybe because its Next booped, ended or claimed this pool for you: read it again
+  useGuideMoved(() => void Promise.all([load(), refresh().catch(() => undefined)]), guided);
 
   // one runner for the screen's life: it keeps the transaction in flight across renders
   const [runner] = useState(() => createTxRunner(setBusy));

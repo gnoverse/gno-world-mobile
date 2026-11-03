@@ -1,12 +1,14 @@
-import { useSegments } from 'expo-router';
+import { router, useSegments } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Animated, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStore } from 'zustand';
 
+import { useServices } from '@/state/app-services';
 import { colors, radius, space } from '@/theme';
 
 import { demoStore, useDemo } from '../store';
+import { doStep } from './do-step';
 import { STEPS, TAB_LABELS } from './steps';
 import { targetsStore } from './targets';
 
@@ -38,6 +40,26 @@ export function GuideBubble() {
   const first: string | undefined = useSegments()[0];
   const tabBar = !first || first === '(tabs)';
   const st = on && step !== null ? STEPS[step] : undefined;
+  const services = useServices();
+  // Next on a step that waits for an action does it (see doStep) before moving on
+  const [doing, setDoing] = useState(false);
+  const onNext = async () => {
+    const at = demoStore.getState();
+    const wait = at.guideStep !== null ? STEPS[at.guideStep].waitFor : undefined;
+    if (wait && services.demo) {
+      setDoing(true);
+      try {
+        await doStep(wait, services, (href) => router.navigate(href));
+      } catch (e) {
+        console.warn('[demo] Next could not do the step:', e); // the guide moves on all the same
+      } finally {
+        setDoing(false);
+      }
+    }
+    // unless the action moved it already (the guided pool, opened, says so) or the demo changed meanwhile
+    const now = demoStore.getState();
+    if (now.on && now.epoch === at.epoch && now.guideStep === at.guideStep) now.next();
+  };
 
   const hit = st?.targets.find((id) => rects[id]);
   const via = st && !hit && tabBar && st.via && rects[st.via] ? rects[st.via] : undefined;
@@ -96,9 +118,11 @@ export function GuideBubble() {
             ))}
           </View>
           <Pressable
-            accessibilityRole="button" accessibilityLabel={last ? 'Done' : 'Next'} hitSlop={8} style={styles.next}
-            onPress={() => demoStore.getState().next()}>
-            <Text style={styles.nextText}>{last ? 'Done' : 'Next'}</Text>
+            accessibilityRole="button" accessibilityLabel={last ? 'Done' : 'Next'} accessibilityState={{ busy: doing, disabled: doing }}
+            disabled={doing} hitSlop={8} style={styles.next} onPress={() => void onNext()}>
+            {/* while Next does the step (a pairing can take seconds), a spinner in place of the word, the button's size kept */}
+            <Text style={[styles.nextText, doing && styles.hidden]}>{last ? 'Done' : 'Next'}</Text>
+            {doing ? <ActivityIndicator testID="guide-next-spinner" size="small" color="#fff" style={styles.spinner} /> : null}
           </Pressable>
         </View>
       </View>
@@ -144,4 +168,6 @@ const styles = StyleSheet.create({
   dotNow: { backgroundColor: colors.bg },
   next: { backgroundColor: colors.bg, borderRadius: radius.s + 2, paddingHorizontal: space.m, paddingVertical: space.xs + 2 },
   nextText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+  hidden: { opacity: 0 },
+  spinner: { ...StyleSheet.absoluteFill },
 });

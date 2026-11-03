@@ -1,5 +1,6 @@
 // Demo mode's switch: on or off, which demo world (the epoch), and where the guide is. In memory only: an app killed
 // during the demo starts again in normal mode.
+import { useEffect, useRef } from 'react';
 import { useStore } from 'zustand';
 import { createStore } from 'zustand/vanilla';
 
@@ -58,3 +59,18 @@ export const demoStore = createStore<DemoState>()((set, get) => {
 });
 
 export const useDemo = <T>(sel: (s: DemoState) => T): T => useStore(demoStore, sel);
+
+/** runs `f` each time the guide moves to another step (its Next may have done the step's action for the user): the
+ *  screens that show what those actions change read it again. `enabled: false` listens to nothing. */
+export function useGuideMoved(f: () => void, enabled = true) {
+  const latest = useRef(f);
+  useEffect(() => {
+    latest.current = f;
+  });
+  useEffect(() => {
+    if (!enabled) return;
+    return demoStore.subscribe((s, before) => {
+      if (s.on && s.guideStep !== before.guideStep) latest.current();
+    });
+  }, [enabled]);
+}

@@ -11,6 +11,7 @@ import { Page } from '@/components/page';
 import { CommandBlock } from '@/components/command-block';
 import { Field } from '@/components/field';
 import { WalletSoon } from '@/components/wallet-soon';
+import { useGuideMoved } from '@/demo-mode/store';
 import { useNow } from '@/hooks/use-now';
 import { revokeCommand } from '@/session/fallback';
 import { expiresSoon, missingPaths, remaining, resetsIn } from '@/session/status';
@@ -63,6 +64,7 @@ export function SessionScreen() {
       setBalance(null);
     };
   }, [shown, api, refresh]);
+  useGuideMoved(() => reread.current?.());
 
   // the wallet answered with an error: the request is over (the store is back on the form or the session);
   // tell the user once, in words

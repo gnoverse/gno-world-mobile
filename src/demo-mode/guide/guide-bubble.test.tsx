@@ -11,7 +11,13 @@ import { targetsStore } from './targets';
 jest.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ top: 20, bottom: 30, left: 0, right: 0 }) }));
 // the route shown: a tab (the tab bar visible) unless a test says otherwise
 let mockSegments: string[] = ['(tabs)'];
-jest.mock('expo-router', () => ({ useSegments: () => mockSegments }));
+const mockNavigate = jest.fn();
+jest.mock('expo-router', () => ({ useSegments: () => mockSegments, router: { navigate: (h: unknown) => mockNavigate(h) } }));
+const mockServices = { demo: {} };
+jest.mock('@/state/app-services', () => ({ useServices: () => mockServices }));
+// what Next does on a step that waits for an action (do-step.test.ts tests the actions themselves)
+const mockDoStep = jest.fn(async (..._a: unknown[]) => undefined);
+jest.mock('./do-step', () => ({ doStep: (...a: unknown[]) => mockDoStep(...a) }));
 
 const s = () => demoStore.getState();
 const at = (step: number) => {
@@ -21,6 +27,9 @@ const at = (step: number) => {
 const style = (id: string) => StyleSheet.flatten(screen.getByTestId(id).props.style);
 
 beforeEach(() => {
+  mockDoStep.mockReset();
+  mockDoStep.mockImplementation(async () => undefined);
+  mockNavigate.mockClear();
   s().leave();
   targetsStore.setState({ rects: {} });
   mockSegments = ['(tabs)'];
@@ -104,6 +113,52 @@ test('Next and Skip drive the store', async () => {
   await fireEvent.press(screen.getByRole('button', { name: 'Skip' }));
   expect(s()).toMatchObject({ on: true, guideStep: null });
   expect(screen.queryByText(STEPS[2].title)).toBeNull();
+});
+
+test("Next on a step that waits for an action does it, on the step's screen, then moves on", async () => {
+  at(6); // Boop
+  await render(<GuideBubble />);
+  let finish!: () => void;
+  mockDoStep.mockImplementation(() => new Promise<undefined>((r) => (finish = () => r(undefined))));
+  await fireEvent.press(screen.getByRole('button', { name: 'Next' }));
+  expect(mockDoStep).toHaveBeenCalledWith('pool.booped', mockServices, expect.any(Function));
+  // the step stays, and Next waits, while the action runs
+  expect(s().guideStep).toBe(6);
+  expect(screen.getByRole('button', { name: 'Next' }).props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+  expect(screen.getByTestId('guide-next-spinner')).toBeTruthy();
+  // its navigation goes through the router
+  (mockDoStep.mock.calls[0][2] as (h: string) => void)('/session');
+  expect(mockNavigate).toHaveBeenCalledWith('/session');
+  await act(async () => finish());
+  expect(s().guideStep).toBe(7);
+  expect(screen.queryByTestId('guide-next-spinner')).toBeNull();
+});
+
+test('Next on a step to read does no action', async () => {
+  at(0);
+  await render(<GuideBubble />);
+  await fireEvent.press(screen.getByRole('button', { name: 'Next' }));
+  expect(mockDoStep).not.toHaveBeenCalled();
+  expect(s().guideStep).toBe(1);
+});
+
+test('an action that moved the guide itself is not moved twice; one that failed still moves on', async () => {
+  at(5); // Pools: opening the pool says so
+  await render(<GuideBubble />);
+  mockDoStep.mockImplementation(async () => {
+    s().emit('pool.opened');
+    return undefined;
+  });
+  await fireEvent.press(screen.getByRole('button', { name: 'Next' }));
+  expect(s().guideStep).toBe(6);
+  const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  mockDoStep.mockImplementation(async () => {
+    throw new Error('no');
+  });
+  await fireEvent.press(screen.getByRole('button', { name: 'Next' }));
+  expect(s().guideStep).toBe(7);
+  expect(warn).toHaveBeenCalled();
+  warn.mockRestore();
 });
 
 test('Done on the last step ends the guide', async () => {
